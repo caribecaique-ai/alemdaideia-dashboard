@@ -1,10 +1,15 @@
-import { type CSSProperties, type ReactNode, useEffect } from "react";
-import { getDashboardSnapshot } from "./services/dashboardSource";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { ALEMDAIDEIA_DASHBOARD_MOCK } from "./data/mockDashboard";
+import {
+  getDashboardSnapshot,
+  subscribeDashboardSnapshotStream,
+} from "./services/dashboardSource";
 import type {
   DashboardEfficiencyRow,
   DashboardKpiCard,
   DashboardMixRow,
   DashboardOpportunity,
+  DashboardSnapshot,
   ReferenceAccent,
 } from "./types/dashboard";
 
@@ -17,15 +22,44 @@ const referenceAccentStyles: Record<ReferenceAccent, { accent: string; soft: str
 };
 
 function App() {
-  const dashboard = getDashboardSnapshot();
+  const [dashboard, setDashboard] = useState<DashboardSnapshot>(ALEMDAIDEIA_DASHBOARD_MOCK);
 
   useEffect(() => {
+    let isMounted = true;
     document.body.classList.remove("dashboard-theme-light");
+
+    const loadDashboard = async () => {
+      const snapshot = await getDashboardSnapshot();
+      if (isMounted) {
+        setDashboard(snapshot);
+      }
+    };
+
+    void loadDashboard();
+    const unsubscribeStream = subscribeDashboardSnapshotStream({
+      onSnapshot: (snapshot) => {
+        if (isMounted) {
+          setDashboard(snapshot);
+        }
+      },
+      onError: () => {
+        void loadDashboard();
+      },
+    });
+    const pollInterval = window.setInterval(() => {
+      void loadDashboard();
+    }, 45_000);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(pollInterval);
+      unsubscribeStream();
+    };
   }, []);
 
   return (
-    <div className="dashboard-root dashboard-static min-h-screen text-slate-100">
-      <main className="dashboard-shell mx-auto max-w-[1620px] p-4 pb-8 md:p-6 xl:p-8">
+    <div className="dashboard-root dashboard-static dashboard-fullscreen text-slate-100">
+      <main className="dashboard-shell dashboard-shell-fullscreen">
         <div className="reference-static-layout">
           <header className="reference-shell reference-header-shell dashboard-header-shell">
             <div className="reference-topbar">
@@ -48,8 +82,8 @@ function App() {
             </div>
           </header>
 
-          <section className="reference-main-grid mt-4">
-            <div className="reference-main-column space-y-4">
+          <section className="reference-main-grid">
+            <div className="reference-main-column">
               <div className="reference-kpi-strip">
                 {dashboard.kpis.map((card) => (
                   <ReferenceKpiCard
@@ -57,6 +91,7 @@ function App() {
                     label={card.label}
                     value={card.value}
                     note={card.note}
+                    noteAccent={card.noteAccent}
                     accent={card.accent}
                   />
                 ))}
@@ -65,8 +100,9 @@ function App() {
               <ReferencePanel
                 title={dashboard.efficiency.title}
                 trailing={dashboard.efficiency.trailing}
+                className="reference-panel-flex"
               >
-                <div className="reference-lane-list">
+                <div className="reference-lane-list reference-scroll-list">
                   {dashboard.efficiency.rows.map((row) => (
                     <ReferenceEfficiencyRow
                       key={row.label}
@@ -79,8 +115,8 @@ function App() {
                 </div>
               </ReferencePanel>
 
-              <ReferencePanel title={dashboard.squad.title}>
-                <div className="overflow-x-auto">
+              <ReferencePanel title={dashboard.squad.title} className="reference-panel-flex">
+                <div className="reference-table-wrap reference-scroll-list">
                   <table className="reference-table w-full min-w-[560px]">
                     <thead>
                       <tr>
@@ -90,23 +126,52 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {dashboard.squad.rows.map((item) => (
-                        <tr key={item.name}>
-                          <td>{item.name}</td>
-                          <td>{item.atendimentos}</td>
-                          <td>{item.sla}</td>
-                          <td>{item.volume}</td>
-                        </tr>
-                      ))}
+                      {dashboard.squad.rows.map((item) => {
+                        const avatarStyle = item.avatarAccent ? referenceAccentStyles[item.avatarAccent] : undefined;
+                        const slaStyle = item.slaAccent ? referenceAccentStyles[item.slaAccent] : undefined;
+                        const volumeStyle = item.volumeAccent ? referenceAccentStyles[item.volumeAccent] : undefined;
+                        
+                        return (
+                          <tr key={item.name}>
+                            <td>
+                              <div className="flex items-center gap-3">
+                                {item.initials && avatarStyle ? (
+                                  <div
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-bold"
+                                    style={{
+                                      backgroundColor: avatarStyle.soft,
+                                      color: avatarStyle.accent,
+                                      border: `1px solid ${avatarStyle.accent}40`,
+                                    }}
+                                  >
+                                    {item.initials}
+                                  </div>
+                                ) : null}
+                                <div>
+                                  <div className="font-semibold text-slate-100">{item.name}</div>
+                                  {item.role ? (
+                                    <div className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-slate-500">
+                                      {item.role}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="font-bold">{item.atendimentos}</td>
+                            <td style={slaStyle ? { color: slaStyle.accent, fontWeight: 700 } : {}}>{item.sla}</td>
+                            <td style={volumeStyle ? { color: volumeStyle.accent, fontWeight: 700 } : {}}>{item.volume}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </ReferencePanel>
             </div>
 
-            <div className="reference-side-column space-y-4">
-              <ReferencePanel title={dashboard.mix.title}>
-                <div className="reference-mix-list">
+            <div className="reference-side-column">
+              <ReferencePanel title={dashboard.mix.title} className="reference-panel-flex">
+                <div className="reference-mix-list reference-scroll-list">
                   {dashboard.mix.rows.map((row) => (
                     <ReferenceMixRow
                       key={row.label}
@@ -119,8 +184,11 @@ function App() {
                 </div>
               </ReferencePanel>
 
-              <ReferencePanel title={dashboard.opportunities.title}>
-                <div className="reference-opportunity-list">
+              <ReferencePanel
+                title={dashboard.opportunities.title}
+                className="reference-panel-flex"
+              >
+                <div className="reference-opportunity-list reference-scroll-list">
                   {dashboard.opportunities.rows.map((task) => (
                     <ReferenceOpportunityCard
                       key={task.title}
@@ -142,7 +210,7 @@ function App() {
   );
 }
 
-function ReferenceKpiCard({ label, value, note, accent }: DashboardKpiCard) {
+function ReferenceKpiCard({ label, value, note, noteAccent, accent }: DashboardKpiCard) {
   const accentStyle = referenceAccentStyles[accent];
 
   return (
@@ -157,7 +225,7 @@ function ReferenceKpiCard({ label, value, note, accent }: DashboardKpiCard) {
     >
       <span className="reference-kpi-label">{label}</span>
       <strong className="reference-kpi-value">{value}</strong>
-      {note ? <span className="reference-kpi-note">{note}</span> : null}
+      {note ? <span className="reference-kpi-note" style={noteAccent ? { color: referenceAccentStyles[noteAccent].accent, fontWeight: 700 } : undefined}>{note}</span> : null}
     </article>
   );
 }
@@ -165,14 +233,16 @@ function ReferenceKpiCard({ label, value, note, accent }: DashboardKpiCard) {
 function ReferencePanel({
   title,
   trailing,
+  className,
   children,
 }: {
   title: string;
   trailing?: string;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="reference-panel">
+    <section className={`reference-panel ${className ?? ""}`.trim()}>
       <div className="reference-panel-head">
         <div>
           <h2>{title}</h2>

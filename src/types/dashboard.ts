@@ -13,6 +13,7 @@ export interface DashboardKpiCard {
   label: string;
   value: string;
   note?: string;
+  noteAccent?: ReferenceAccent;
   accent: ReferenceAccent;
 }
 
@@ -32,9 +33,14 @@ export interface DashboardMixRow {
 
 export interface DashboardSquadRow {
   name: string;
+  role?: string;
+  initials?: string;
+  avatarAccent?: ReferenceAccent;
   volume: string;
+  volumeAccent?: ReferenceAccent;
   atendimentos: string;
   sla: string;
+  slaAccent?: ReferenceAccent;
 }
 
 export interface DashboardOpportunity {
