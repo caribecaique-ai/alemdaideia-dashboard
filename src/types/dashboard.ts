@@ -17,6 +17,22 @@ export interface DashboardKpiCard {
   accent: ReferenceAccent;
 }
 
+export interface DashboardChatSla {
+  title: string;
+  value: string;
+  note: string;
+  status: string;
+  progress: number;
+  accent: ReferenceAccent;
+  targetSeconds?: number;
+  averageSeconds?: number;
+  compliancePct?: number;
+  sampleSize?: number;
+  withinTargetCount?: number;
+  outsideTargetCount?: number;
+  waitingCount?: number;
+}
+
 export interface DashboardEfficiencyRow {
   label: string;
   note: string;
@@ -36,10 +52,14 @@ export interface DashboardSquadRow {
   role?: string;
   initials?: string;
   avatarAccent?: ReferenceAccent;
+  chatCount?: number;
   volume: string;
+  volumeValue?: number;
   volumeAccent?: ReferenceAccent;
   atendimentos: string;
+  atendimentosValue?: number;
   sla: string;
+  slaSeconds?: number;
   slaAccent?: ReferenceAccent;
 }
 
@@ -55,6 +75,7 @@ export interface DashboardOpportunity {
 export interface DashboardSnapshot {
   header: DashboardHeader;
   kpis: DashboardKpiCard[];
+  chatSla?: DashboardChatSla;
   efficiency: {
     title: string;
     trailing: string;

@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:front": "vite",
+    "dev:api": "npm --prefix server run dev",
     "build": "tsc && vite build",
+    "build:api": "npm --prefix server run build",
+    "api:init": "npm --prefix server run db:init",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },

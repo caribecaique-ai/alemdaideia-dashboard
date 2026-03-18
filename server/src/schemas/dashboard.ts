@@ -16,7 +16,24 @@ const dashboardKpiCardSchema = z.object({
   label: z.string().min(1),
   value: z.string().min(1),
   note: z.string().optional(),
+  noteAccent: referenceAccentSchema.optional(),
   accent: referenceAccentSchema,
+});
+
+const dashboardChatSlaSchema = z.object({
+  title: z.string().min(1),
+  value: z.string().min(1),
+  note: z.string().min(1),
+  status: z.string().min(1),
+  progress: z.number().min(0).max(100),
+  accent: referenceAccentSchema,
+  targetSeconds: z.number().positive().optional(),
+  averageSeconds: z.number().nonnegative().optional(),
+  compliancePct: z.number().min(0).max(100).optional(),
+  sampleSize: z.number().int().nonnegative().optional(),
+  withinTargetCount: z.number().int().nonnegative().optional(),
+  outsideTargetCount: z.number().int().nonnegative().optional(),
+  waitingCount: z.number().int().nonnegative().optional(),
 });
 
 const dashboardEfficiencyRowSchema = z.object({
@@ -35,9 +52,18 @@ const dashboardMixRowSchema = z.object({
 
 const dashboardSquadRowSchema = z.object({
   name: z.string().min(1),
+  role: z.string().min(1).optional(),
+  initials: z.string().min(1).optional(),
+  avatarAccent: referenceAccentSchema.optional(),
+  chatCount: z.number().int().nonnegative().optional(),
   volume: z.string().min(1),
+  volumeValue: z.number().nonnegative().optional(),
+  volumeAccent: referenceAccentSchema.optional(),
   atendimentos: z.string().min(1),
+  atendimentosValue: z.number().int().nonnegative().optional(),
   sla: z.string().min(1),
+  slaSeconds: z.number().nonnegative().optional(),
+  slaAccent: referenceAccentSchema.optional(),
 });
 
 const dashboardOpportunitySchema = z.object({
@@ -52,6 +78,7 @@ const dashboardOpportunitySchema = z.object({
 export const dashboardSnapshotSchema = z.object({
   header: dashboardHeaderSchema,
   kpis: z.array(dashboardKpiCardSchema),
+  chatSla: dashboardChatSlaSchema.optional(),
   efficiency: z.object({
     title: z.string().min(1),
     trailing: z.string().min(1),

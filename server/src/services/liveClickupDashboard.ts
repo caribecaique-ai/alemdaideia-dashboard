@@ -12,6 +12,12 @@ import {
 } from "../config/dashboardScope.js";
 import { DEFAULT_DASHBOARD_SNAPSHOT } from "../lib/defaultSnapshot.js";
 import type { DashboardSnapshot } from "../schemas/dashboard.js";
+import {
+  fetchBradialChatMetrics,
+  loadBradialChatConfig,
+  matchBradialAgentMetric,
+  type BradialChatMetricsResult,
+} from "./bradialChatMetrics.js";
 import { getSnapshot, saveSnapshot } from "../storage/dashboardRepository.js";
 
 type Accent = DashboardSnapshot["kpis"][number]["accent"];
@@ -174,6 +180,8 @@ const ACTIVE_STATUS_FOR_OPPORTUNITY = [
 ];
 const EFFICIENCY_ACCENTS: Accent[] = ["violet", "blue", "rose", "amber", "emerald"];
 const MIX_ACCENTS: Accent[] = ["amber", "rose", "violet", "blue", "emerald"];
+const PERSON_ACCENTS: Accent[] = ["emerald", "amber", "blue", "violet", "rose"];
+const CHAT_METRICS_TTL_MS = 60_000;
 
 function normalizeText(value: unknown): string {
   return String(value ?? "")
@@ -251,7 +259,7 @@ function formatDateTime(value: Date): string {
 }
 
 function formatDurationFromMs(value: number | null): string {
-  if (!value || !Number.isFinite(value) || value <= 0) {
+  if (value === null || !Number.isFinite(value) || value < 0) {
     return "--";
   }
   const totalSeconds = Math.round(value / 1000);
@@ -262,11 +270,60 @@ function formatDurationFromMs(value: number | null): string {
 
   if (days > 0) return `${days}d ${hours}h`;
   if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m ${seconds}s`;
+  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
 }
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function accentFromName(value: string): Accent {
+  const normalized = normalizeText(value);
+  if (!normalized) return "blue";
+
+  let hash = 0;
+  for (const char of normalized) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+  return PERSON_ACCENTS[hash % PERSON_ACCENTS.length];
+}
+
+function initialsFromName(value: string): string {
+  const parts = String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!parts.length) return "NA";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] || ""}${parts[parts.length - 1][0] || ""}`.toUpperCase();
+}
+
+function accentForSlaSeconds(value: number | null | undefined, targetSeconds = 300): Accent {
+  if (value === null || value === undefined || !Number.isFinite(value) || value < 0) return "blue";
+  if (value <= targetSeconds) return "emerald";
+  if (value <= targetSeconds * 1.35) return "amber";
+  if (value <= targetSeconds * 2) return "blue";
+  return "rose";
+}
+
+function accentForVolume(value: number, maxValue: number): Accent {
+  if (!Number.isFinite(value) || value <= 0) return "rose";
+  const ratio = maxValue > 0 ? value / maxValue : 0;
+  if (ratio >= 0.72) return "emerald";
+  if (ratio >= 0.4) return "amber";
+  if (ratio >= 0.2) return "blue";
+  return "violet";
+}
+
+function formatBradialChatLabel(count: number | null | undefined): string {
+  if (count === null || count === undefined || !Number.isFinite(count) || count <= 0) {
+    return "0 chats no Bradial";
+  }
+  if (count === 1) {
+    return "1 chat no Bradial";
+  }
+  return `${count} chats no Bradial`;
 }
 
 function extractPrimaryAssignee(assignees: ClickUpAssignee[] | undefined): string {
@@ -460,6 +517,8 @@ export class LiveClickupDashboardService extends EventEmitter {
 
   private readonly config: ServiceConfig;
 
+  private readonly chatConfig = loadBradialChatConfig();
+
   private timer: NodeJS.Timeout | null = null;
 
   private inFlight: Promise<RefreshResult> | null = null;
@@ -467,6 +526,8 @@ export class LiveClickupDashboardService extends EventEmitter {
   private currentHash: string | null = null;
 
   private cachedScope: { value: SalesScope; expiresAt: number } | null = null;
+
+  private cachedChatMetrics: { value: BradialChatMetricsResult; expiresAt: number } | null = null;
 
   private version = 0;
 
@@ -549,6 +610,24 @@ export class LiveClickupDashboardService extends EventEmitter {
     return getSnapshot(this.slug)?.payload || DEFAULT_DASHBOARD_SNAPSHOT;
   }
 
+  private async getBradialChatMetrics(): Promise<BradialChatMetricsResult | null> {
+    if (!this.chatConfig) return null;
+    if (this.cachedChatMetrics && this.cachedChatMetrics.expiresAt > Date.now()) {
+      return this.cachedChatMetrics.value;
+    }
+
+    try {
+      const metrics = await fetchBradialChatMetrics(this.chatConfig);
+      this.cachedChatMetrics = {
+        value: metrics,
+        expiresAt: Date.now() + CHAT_METRICS_TTL_MS,
+      };
+      return metrics;
+    } catch {
+      return this.cachedChatMetrics?.value || null;
+    }
+  }
+
   private async doRefresh(trigger: string): Promise<RefreshResult> {
     if (!this.config.apiToken) {
       throw new Error(
@@ -557,8 +636,11 @@ export class LiveClickupDashboardService extends EventEmitter {
     }
 
     const scope = await this.resolveSalesScope();
-    const tasks = await this.fetchTasksForScope(scope);
-    const snapshot = this.buildSnapshot(scope, tasks);
+    const [tasks, chatMetrics] = await Promise.all([
+      this.fetchTasksForScope(scope),
+      this.getBradialChatMetrics(),
+    ]);
+    const snapshot = this.buildSnapshot(scope, tasks, chatMetrics);
     const snapshotHash = hashSnapshot(snapshot);
     const changed = snapshotHash !== this.currentHash;
 
@@ -757,7 +839,11 @@ export class LiveClickupDashboardService extends EventEmitter {
     };
   }
 
-  private buildSnapshot(scope: SalesScope, tasks: ClickUpTask[]): DashboardSnapshot {
+  private buildSnapshot(
+    scope: SalesScope,
+    tasks: ClickUpTask[],
+    chatMetrics: BradialChatMetricsResult | null,
+  ): DashboardSnapshot {
     const leads = this.mapLeads(tasks);
     const numbers = this.computeMainNumbers(leads);
 
@@ -808,19 +894,44 @@ export class LiveClickupDashboardService extends EventEmitter {
       }
       assigneeMap.set(owner, current);
     }
+    const chatTargetSeconds = chatMetrics?.summary.targetSeconds || 300;
     const squadRows = [...assigneeMap.entries()]
       .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 8)
-      .map(([name, data]) => ({
-        name,
-        atendimentos: String(data.count),
-        sla: formatDurationFromMs(safeAverage(data.responseTimes)),
-        volume: compactBrCurrency(data.volume),
-      }));
+      .map(([name, data]) => {
+        const matchedChatMetric = chatMetrics ? matchBradialAgentMetric(name, chatMetrics.byAgent) : null;
+        const clickupSlaMs = safeAverage(data.responseTimes);
+        const chatCount = matchedChatMetric?.repliedCount ?? 0;
+        const resolvedSlaSeconds =
+          matchedChatMetric?.averageSeconds ??
+          (clickupSlaMs > 0 ? Math.max(1, Math.round(clickupSlaMs / 1000)) : undefined);
+
+        return {
+          name,
+          role: formatBradialChatLabel(chatCount),
+          initials: initialsFromName(name),
+          avatarAccent: accentFromName(name),
+          chatCount,
+          atendimentos: String(data.count),
+          atendimentosValue: data.count,
+          sla: resolvedSlaSeconds !== undefined ? formatDurationFromMs(resolvedSlaSeconds * 1000) : "--",
+          slaSeconds: resolvedSlaSeconds,
+          slaAccent: matchedChatMetric?.accent || accentForSlaSeconds(resolvedSlaSeconds, chatTargetSeconds),
+          volume: compactBrCurrency(data.volume),
+          volumeValue: data.volume,
+          volumeAccent: "blue" as Accent,
+        };
+      })
+      .filter((row) => row.volumeValue > 0 || row.chatCount > 0)
+      .slice(0, 8);
+    const maxSquadVolume = squadRows.reduce((max, row) => Math.max(max, row.volumeValue || 0), 0);
+    const rankedSquadRows = squadRows.map((row) => ({
+      ...row,
+      volumeAccent: accentForVolume(row.volumeValue || 0, maxSquadVolume),
+    }));
 
     const mixRows = [...productCount.entries()]
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
+      .slice(0, 3)
       .map(([product, count], index) => ({
         label: product.toUpperCase(),
         value: count,
@@ -859,7 +970,7 @@ export class LiveClickupDashboardService extends EventEmitter {
         subtitle: "ANALISE DE MIX, ORIGEM E PERFORMANCE HIGH-TICKET",
         liveMetricLabel: "LTV ESTIMADO",
         liveMetricValue: compactBrCurrency(numbers.estimatedLtv),
-        status: "CLICKUP LIVE: ATIVO",
+        status: chatMetrics ? "CLICKUP + BRADIAL: ATIVO" : "CLICKUP LIVE: ATIVO",
       },
       kpis: [
         {
@@ -881,6 +992,16 @@ export class LiveClickupDashboardService extends EventEmitter {
           accent: "amber",
         },
       ],
+      chatSla:
+        chatMetrics?.summary ||
+        ({
+          title: "SLA Bradial Chat",
+          value: "--",
+          note: "Fonte do chat indisponivel para calculo neste ambiente",
+          status: "SEM CHAT",
+          progress: 0,
+          accent: "blue",
+        } satisfies NonNullable<DashboardSnapshot["chatSla"]>),
       efficiency: {
         title: "Eficiencia por Origem (SDR)",
         trailing: `TOTAL LEADS: ${numbers.totalLeads}`,
@@ -888,8 +1009,8 @@ export class LiveClickupDashboardService extends EventEmitter {
       },
       squad: {
         title: "Elite Squad Performance",
-        columns: ["Consultor", "Atendimentos", "SLA BRADTAIL", "VOLUME VENDAS"],
-        rows: squadRows,
+        columns: ["Consultor", "Atendimentos", "Chats Bradial", "SLA BRADIAL", "VOLUME VENDAS"],
+        rows: rankedSquadRows,
       },
       mix: {
         title: "Mix de Vendas (Produto)",
