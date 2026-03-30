@@ -7,12 +7,42 @@ interface DashboardSnapshotResponse {
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() ?? "";
 
+function isLoopbackHost(hostname: string): boolean {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function resolveApiBaseUrl(): string {
+  if (typeof window === "undefined") {
+    return apiBaseUrl.replace(/\/+$/, "");
+  }
+
+  if (!apiBaseUrl) {
+    return window.location.origin;
+  }
+
+  try {
+    const resolvedUrl = new URL(apiBaseUrl, window.location.origin);
+
+    // When the dashboard is opened from another machine or tunnel, keep API requests
+    // on the same origin so a single public URL can proxy the backend.
+    if (isLoopbackHost(resolvedUrl.hostname) && !isLoopbackHost(window.location.hostname)) {
+      return window.location.origin;
+    }
+
+    return resolvedUrl.toString().replace(/\/+$/, "");
+  } catch {
+    return window.location.origin;
+  }
+}
+
 function buildSnapshotUrl(): string {
-  return `${apiBaseUrl.replace(/\/+$/, "")}/api/dashboard/snapshot`;
+  const resolvedApiBaseUrl = resolveApiBaseUrl();
+  return resolvedApiBaseUrl ? `${resolvedApiBaseUrl}/api/dashboard/snapshot` : "";
 }
 
 function buildStreamUrl(): string {
-  return `${apiBaseUrl.replace(/\/+$/, "")}/api/dashboard/stream`;
+  const resolvedApiBaseUrl = resolveApiBaseUrl();
+  return resolvedApiBaseUrl ? `${resolvedApiBaseUrl}/api/dashboard/stream` : "";
 }
 
 interface StreamSnapshotEvent {
@@ -31,12 +61,14 @@ interface StreamHeartbeatEvent {
 
 // This keeps the prototype mock-safe while allowing backend integration when available.
 export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
-  if (!apiBaseUrl) {
+  const snapshotUrl = buildSnapshotUrl();
+
+  if (!snapshotUrl) {
     return ALEMDAIDEIA_DASHBOARD_MOCK;
   }
 
   try {
-    const response = await fetch(buildSnapshotUrl(), {
+    const response = await fetch(snapshotUrl, {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -65,11 +97,13 @@ export function subscribeDashboardSnapshotStream(handlers: {
   onHeartbeat?: (event: StreamHeartbeatEvent) => void;
   onError?: (error: Event) => void;
 }): () => void {
-  if (!apiBaseUrl || typeof window === "undefined" || typeof window.EventSource === "undefined") {
+  const streamUrl = buildStreamUrl();
+
+  if (!streamUrl || typeof window === "undefined" || typeof window.EventSource === "undefined") {
     return () => undefined;
   }
 
-  const eventSource = new EventSource(buildStreamUrl());
+  const eventSource = new EventSource(streamUrl);
 
   const snapshotHandler = (event: MessageEvent<string>) => {
     try {

@@ -432,6 +432,21 @@ function accentForProbability(probability: number): Accent {
   return "rose";
 }
 
+function accentForOperationalStatus(status: string): Accent {
+  const normalized = normalizeStatus(status);
+  if (normalized.includes("qualific")) return "amber";
+  if (normalized.includes("oportun")) return "emerald";
+  if (normalized.includes("reuniao")) return "blue";
+  if (normalized.includes("follow")) return "violet";
+  if (normalized.includes("negocio fechado") || normalized.includes("ganho")) return "emerald";
+  if (normalized.includes("perdido") || normalized.includes("desqualificado")) return "rose";
+  return "blue";
+}
+
+function formatInteger(value: number): string {
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(Math.max(0, Math.round(value)));
+}
+
 function pickMode(values: number[]): number | null {
   if (!values.length) return null;
   const map = new Map<number, number>();
@@ -882,28 +897,30 @@ export class LiveClickupDashboardService extends EventEmitter {
 
     const assigneeMap = new Map<
       string,
-      { count: number; volume: number; responseTimes: number[] }
+      { assignedLeadCount: number; volume: number }
     >();
     for (const lead of leads) {
-      const owner = lead.primaryAssignee || "Sem responsavel";
-      const current = assigneeMap.get(owner) || { count: 0, volume: 0, responseTimes: [] };
-      current.count += 1;
-      current.volume += lead.saleValue || 0;
-      if (lead.createdAtMs && lead.updatedAtMs && lead.updatedAtMs >= lead.createdAtMs) {
-        current.responseTimes.push(lead.updatedAtMs - lead.createdAtMs);
+      const attributedOwners = new Set(
+        (lead.assignees.length ? lead.assignees : [lead.primaryAssignee || "Sem responsavel"]).filter(Boolean),
+      );
+
+      for (const owner of attributedOwners) {
+        const current = assigneeMap.get(owner) || { assignedLeadCount: 0, volume: 0 };
+        current.assignedLeadCount += 1;
+        assigneeMap.set(owner, current);
       }
-      assigneeMap.set(owner, current);
+
+      const primaryOwner = lead.primaryAssignee || "Sem responsavel";
+      const primaryCurrent = assigneeMap.get(primaryOwner) || { assignedLeadCount: 0, volume: 0 };
+      primaryCurrent.volume += lead.saleValue || 0;
+      assigneeMap.set(primaryOwner, primaryCurrent);
     }
-    const chatTargetSeconds = chatMetrics?.summary.targetSeconds || 300;
     const squadRows = [...assigneeMap.entries()]
-      .sort((a, b) => b[1].count - a[1].count)
+      .sort((a, b) => b[1].assignedLeadCount - a[1].assignedLeadCount || b[1].volume - a[1].volume)
       .map(([name, data]) => {
         const matchedChatMetric = chatMetrics ? matchBradialAgentMetric(name, chatMetrics.byAgent) : null;
-        const clickupSlaMs = safeAverage(data.responseTimes);
         const chatCount = matchedChatMetric?.repliedCount ?? 0;
-        const resolvedSlaSeconds =
-          matchedChatMetric?.averageSeconds ??
-          (clickupSlaMs > 0 ? Math.max(1, Math.round(clickupSlaMs / 1000)) : undefined);
+        const resolvedSlaSeconds = matchedChatMetric?.averageSeconds;
 
         return {
           name,
@@ -911,17 +928,17 @@ export class LiveClickupDashboardService extends EventEmitter {
           initials: initialsFromName(name),
           avatarAccent: accentFromName(name),
           chatCount,
-          atendimentos: String(data.count),
-          atendimentosValue: data.count,
+          atendimentos: String(data.assignedLeadCount),
+          atendimentosValue: data.assignedLeadCount,
           sla: resolvedSlaSeconds !== undefined ? formatDurationFromMs(resolvedSlaSeconds * 1000) : "--",
           slaSeconds: resolvedSlaSeconds,
-          slaAccent: matchedChatMetric?.accent || accentForSlaSeconds(resolvedSlaSeconds, chatTargetSeconds),
+          slaAccent: matchedChatMetric?.accent || accentForSlaSeconds(undefined),
           volume: compactBrCurrency(data.volume),
           volumeValue: data.volume,
           volumeAccent: "blue" as Accent,
         };
       })
-      .filter((row) => row.volumeValue > 0 || row.chatCount > 0)
+      .filter((row) => row.atendimentosValue > 0 || row.volumeValue > 0 || row.chatCount > 0)
       .slice(0, 8);
     const maxSquadVolume = squadRows.reduce((max, row) => Math.max(max, row.volumeValue || 0), 0);
     const rankedSquadRows = squadRows.map((row) => ({
@@ -963,24 +980,167 @@ export class LiveClickupDashboardService extends EventEmitter {
         };
       });
 
+    const now = Date.now();
+    const staleCutoffMs = now - 7 * 86_400_000;
+    const recentCutoffMs = now - 48 * 3_600_000;
+    const activeOperationalLeads = leads.filter((lead) => !isLostLead(lead) && !isWonLead(lead));
+    const stalledLeads = activeOperationalLeads.filter(
+      (lead) => !lead.updatedAtMs || lead.updatedAtMs < staleCutoffMs,
+    );
+    const recentlyUpdatedLeads = leads.filter((lead) => lead.updatedAtMs && lead.updatedAtMs >= recentCutoffMs);
+    const closedLeads = leads.filter((lead) => isWonLead(lead) || isLostLead(lead) || Boolean(lead.closedAtMs));
+    const unassignedLeads = leads.filter((lead) => !lead.primaryAssignee || lead.primaryAssignee === "Sem responsavel");
+
+    const stageMap = new Map<string, number>();
+    for (const lead of leads) {
+      const label = lead.status || "Sem status";
+      stageMap.set(label, (stageMap.get(label) || 0) + 1);
+    }
+    const maxStageCount = [...stageMap.values()].reduce((max, value) => Math.max(max, value), 0);
+    const operationStageRows = [...stageMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([status, count]) => ({
+        label: status,
+        note: `${formatInteger(count)} tasks`,
+        progress: clamp(maxStageCount > 0 ? (count / maxStageCount) * 100 : 0, 8, 100),
+        accent: accentForOperationalStatus(status),
+      }));
+
+    const ownerMap = new Map<string, { active: number; stalled: number; closed: number }>();
+    for (const lead of leads) {
+      const owner = lead.primaryAssignee || "Sem responsavel";
+      const bucket = ownerMap.get(owner) || { active: 0, stalled: 0, closed: 0 };
+
+      if (isWonLead(lead) || isLostLead(lead) || lead.closedAtMs) {
+        bucket.closed += 1;
+      } else {
+        bucket.active += 1;
+        if (!lead.updatedAtMs || lead.updatedAtMs < staleCutoffMs) {
+          bucket.stalled += 1;
+        }
+      }
+
+      ownerMap.set(owner, bucket);
+    }
+    const operationOwnerRows = [...ownerMap.entries()]
+      .sort((a, b) => b[1].active - a[1].active || b[1].stalled - a[1].stalled || b[1].closed - a[1].closed)
+      .slice(0, 8)
+      .map(([name, data]) => ({
+        name,
+        active: formatInteger(data.active),
+        activeValue: data.active,
+        stalled: formatInteger(data.stalled),
+        stalledValue: data.stalled,
+        closed: formatInteger(data.closed),
+        closedValue: data.closed,
+        accent: accentFromName(name),
+      }));
+
+    const stalledRatio = activeOperationalLeads.length > 0 ? stalledLeads.length / activeOperationalLeads.length : 0;
+    const operationStatus =
+      stalledRatio >= 0.35 ? "ATENÇÃO OPERACIONAL" : stalledRatio >= 0.18 ? "FLUXO EM ALERTA" : "CLICKUP AO VIVO";
+    const dominantStage = [...stageMap.entries()].sort((a, b) => b[1] - a[1])[0];
+    const operationNote = dominantStage
+      ? `Maior concentracao em ${dominantStage[0]} e ${formatInteger(stalledLeads.length)} tasks paradas ha 7 dias ou mais.`
+      : "Panorama operacional das tasks monitoradas no ClickUp.";
+
+    const financialPipelineLeads = leads.filter(
+      (lead) => !isLostLead(lead) && !isWonLead(lead) && Number(lead.saleValue || 0) > 0,
+    );
+    const wonFinancialLeads = leads.filter((lead) => isWonLead(lead) && Number(lead.saleValue || 0) > 0);
+    const lostFinancialLeads = leads.filter((lead) => isLostLead(lead) && Number(lead.saleValue || 0) > 0);
+    const pipelineValue = financialPipelineLeads.reduce((sum, lead) => sum + (lead.saleValue || 0), 0);
+    const weightedForecastValue = financialPipelineLeads.reduce(
+      (sum, lead) => sum + (lead.saleValue || 0) * (statusProbability(lead.status) / 100),
+      0,
+    );
+    const wonValue = wonFinancialLeads.reduce((sum, lead) => sum + (lead.saleValue || 0), 0);
+    const lostValue = lostFinancialLeads.reduce((sum, lead) => sum + (lead.saleValue || 0), 0);
+    const stalledPipelineValue = financialPipelineLeads
+      .filter((lead) => !lead.updatedAtMs || lead.updatedAtMs < staleCutoffMs)
+      .reduce((sum, lead) => sum + (lead.saleValue || 0), 0);
+
+    const financialStageMap = new Map<string, { count: number; value: number }>();
+    for (const lead of financialPipelineLeads) {
+      const key = lead.status || "Sem status";
+      const current = financialStageMap.get(key) || { count: 0, value: 0 };
+      current.count += 1;
+      current.value += lead.saleValue || 0;
+      financialStageMap.set(key, current);
+    }
+    const maxFinancialStageValue = [...financialStageMap.values()].reduce((max, item) => Math.max(max, item.value), 0);
+    const financialBreakdownRows = [...financialStageMap.entries()]
+      .sort((a, b) => b[1].value - a[1].value || b[1].count - a[1].count)
+      .slice(0, 6)
+      .map(([status, metrics]) => ({
+        label: status,
+        note: `${compactBrCurrency(metrics.value)} • ${formatInteger(metrics.count)} negocios`,
+        progress: clamp(maxFinancialStageValue > 0 ? (metrics.value / maxFinancialStageValue) * 100 : 0, 8, 100),
+        accent: accentForOperationalStatus(status),
+      }));
+
+    const financialOwnerMap = new Map<string, { pipeline: number; forecast: number; won: number }>();
+    for (const lead of leads) {
+      const owner = lead.primaryAssignee || "Sem responsavel";
+      const bucket = financialOwnerMap.get(owner) || { pipeline: 0, forecast: 0, won: 0 };
+      const saleValue = lead.saleValue || 0;
+
+      if (saleValue > 0) {
+        if (isWonLead(lead)) {
+          bucket.won += saleValue;
+        } else if (!isLostLead(lead)) {
+          bucket.pipeline += saleValue;
+          bucket.forecast += saleValue * (statusProbability(lead.status) / 100);
+        }
+      }
+
+      financialOwnerMap.set(owner, bucket);
+    }
+    const financialOwnerRows = [...financialOwnerMap.entries()]
+      .filter(([, data]) => data.pipeline > 0 || data.forecast > 0 || data.won > 0)
+      .sort((a, b) => b[1].pipeline - a[1].pipeline || b[1].forecast - a[1].forecast || b[1].won - a[1].won)
+      .slice(0, 8)
+      .map(([name, data]) => ({
+        name,
+        pipeline: compactBrCurrency(data.pipeline),
+        pipelineValue: data.pipeline,
+        forecast: compactBrCurrency(data.forecast),
+        forecastValue: data.forecast,
+        won: compactBrCurrency(data.won),
+        wonValue: data.won,
+        accent: accentFromName(name),
+      }));
+
+    const financialStatus =
+      weightedForecastValue >= pipelineValue * 0.6
+        ? "PREVISÃO CONSISTENTE"
+        : weightedForecastValue >= pipelineValue * 0.4
+          ? "PREVISÃO MODERADA"
+          : "PREVISÃO EM ALERTA";
+    const financialNote =
+      pipelineValue > 0
+        ? `Pipeline de ${compactBrCurrency(pipelineValue)} com forecast ponderado de ${compactBrCurrency(weightedForecastValue)} e ${compactBrCurrency(stalledPipelineValue)} parados ha 7 dias ou mais.`
+        : "Sem pipeline com valor suficiente para leitura financeira.";
+
     return {
       header: {
         brand: "ALEM DA IDEIA",
-        context: "COMMERCIAL INTELLIGENCE",
-        subtitle: "ANALISE DE MIX, ORIGEM E PERFORMANCE HIGH-TICKET",
+        context: "INTELIGÊNCIA COMERCIAL",
+        subtitle: "ANÁLISE DE MIX, ORIGEM E PERFORMANCE HIGH-TICKET",
         liveMetricLabel: "LTV ESTIMADO",
         liveMetricValue: compactBrCurrency(numbers.estimatedLtv),
-        status: chatMetrics ? "CLICKUP + BRADIAL: ATIVO" : "CLICKUP LIVE: ATIVO",
+        status: chatMetrics ? "CLICKUP E BRADIAL ATIVOS" : "CLICKUP AO VIVO",
       },
       kpis: [
         {
-          label: "TICKET MEDIO (GERAL)",
+          label: "TICKET MÉDIO (GERAL)",
           value: integerBrCurrency(ticketReference),
-          note: `${numbers.salesWithValue} negocios com valor`,
+          note: `${numbers.salesWithValue} negócios com valor`,
           accent: "emerald",
         },
         {
-          label: "BEST-SELLER (VOLUME)",
+          label: "PRODUTO LÍDER (VOLUME)",
           value: bestSeller?.[0] || "Sem dados",
           note: bestSeller ? `${bestSeller[1]} vendas` : undefined,
           accent: "violet",
@@ -995,13 +1155,120 @@ export class LiveClickupDashboardService extends EventEmitter {
       chatSla:
         chatMetrics?.summary ||
         ({
-          title: "SLA Bradial Chat",
+          title: "SLA do Chat Bradial",
           value: "--",
-          note: "Fonte do chat indisponivel para calculo neste ambiente",
+          note: "Fonte do chat indisponível para cálculo neste ambiente",
           status: "SEM CHAT",
           progress: 0,
           accent: "blue",
         } satisfies NonNullable<DashboardSnapshot["chatSla"]>),
+      atendimento: chatMetrics?.atendimento,
+      operacao: {
+        title: "Operação ClickUp",
+        status: operationStatus,
+        note: operationNote,
+        metrics: [
+          {
+            label: "TAREFAS MONITORADAS",
+            value: formatInteger(leads.length),
+            note: "universo atual do escopo",
+            accent: "emerald",
+          },
+          {
+            label: "ATIVAS",
+            value: formatInteger(activeOperationalLeads.length),
+            note: "em aberto no momento",
+            accent: "blue",
+          },
+          {
+            label: "PARADAS 7D+",
+            value: formatInteger(stalledLeads.length),
+            note: "sem atualizacao recente",
+            accent: "rose",
+          },
+          {
+            label: "ATUALIZADAS 48H",
+            value: formatInteger(recentlyUpdatedLeads.length),
+            note: "movimento recente",
+            accent: "violet",
+          },
+          {
+            label: "CONCLUIDAS",
+            value: formatInteger(closedLeads.length),
+            note: "ganhas ou encerradas",
+            accent: "amber",
+          },
+          {
+            label: "SEM RESPONSÁVEL",
+            value: formatInteger(unassignedLeads.length),
+            note: "pedem triagem",
+            accent: "rose",
+          },
+        ],
+        stages: {
+          title: "Andamento por Etapa",
+          trailing: "STATUS DO CLICKUP",
+          rows: operationStageRows,
+        },
+        owners: {
+          title: "Carga por Responsável",
+          columns: ["Responsável", "Ativas", "Paradas 7d+", "Concluídas"],
+          rows: operationOwnerRows,
+        },
+      },
+      financeiro: {
+        title: "Financeiro Comercial",
+        status: financialStatus,
+        note: financialNote,
+        metrics: [
+          {
+            label: "FUNIL TOTAL",
+            value: compactBrCurrency(pipelineValue),
+            note: "oportunidades ativas com valor",
+            accent: "emerald",
+          },
+          {
+            label: "PREVISÃO PONDERADA",
+            value: compactBrCurrency(weightedForecastValue),
+            note: "valor x probabilidade por etapa",
+            accent: "blue",
+          },
+          {
+            label: "GANHO",
+            value: compactBrCurrency(wonValue),
+            note: "negocios marcados como ganhos",
+            accent: "amber",
+          },
+          {
+            label: "PERDIDO",
+            value: compactBrCurrency(lostValue),
+            note: "valor perdido no funil",
+            accent: "rose",
+          },
+          {
+            label: "TICKET MÉDIO",
+            value: integerBrCurrency(ticketReference),
+            note: "negocios com valor",
+            accent: "violet",
+          },
+          {
+            label: "VALOR PARADO 7D+",
+            value: compactBrCurrency(stalledPipelineValue),
+            note: "pipeline sem atualizacao recente",
+            accent: "rose",
+          },
+        ],
+        breakdown: {
+          title: "Receita por Etapa",
+          trailing: "FUNIL COMERCIAL",
+          rows: financialBreakdownRows,
+        },
+        owners: {
+          title: "Financeiro por Responsável",
+          columns: ["Responsável", "Funil", "Previsão", "Ganho"],
+          rows: financialOwnerRows,
+        },
+      },
       efficiency: {
         title: "Eficiencia por Origem (SDR)",
         trailing: `TOTAL LEADS: ${numbers.totalLeads}`,
@@ -1009,7 +1276,7 @@ export class LiveClickupDashboardService extends EventEmitter {
       },
       squad: {
         title: "Elite Squad Performance",
-        columns: ["Consultor", "Atendimentos", "Chats Bradial", "SLA BRADIAL", "VOLUME VENDAS"],
+        columns: ["Consultor", "Leads atribuídos", "Chats Bradial", "SLA BRADIAL", "VOLUME VENDAS"],
         rows: rankedSquadRows,
       },
       mix: {
@@ -1017,7 +1284,7 @@ export class LiveClickupDashboardService extends EventEmitter {
         rows: mixRows,
       },
       opportunities: {
-        title: "Top Opportunities",
+        title: "Principais Oportunidades",
         rows: opportunities,
       },
     };

@@ -28,6 +28,7 @@ export interface DashboardChatSla {
   averageSeconds?: number;
   compliancePct?: number;
   sampleSize?: number;
+  partialData?: boolean;
   withinTargetCount?: number;
   outsideTargetCount?: number;
   waitingCount?: number;
@@ -72,10 +73,91 @@ export interface DashboardOpportunity {
   accent: ReferenceAccent;
 }
 
+export interface DashboardAtendimentoAgentRow {
+  name: string;
+  messages: string;
+  messagesValue?: number;
+  activeConversations: string;
+  activeConversationsValue?: number;
+  newConversations: string;
+  newConversationsValue?: number;
+  accent: ReferenceAccent;
+}
+
+export interface DashboardOperacaoOwnerRow {
+  name: string;
+  active: string;
+  activeValue?: number;
+  stalled: string;
+  stalledValue?: number;
+  closed: string;
+  closedValue?: number;
+  accent: ReferenceAccent;
+}
+
+export interface DashboardFinanceiroOwnerRow {
+  name: string;
+  pipeline: string;
+  pipelineValue?: number;
+  forecast: string;
+  forecastValue?: number;
+  won: string;
+  wonValue?: number;
+  accent: ReferenceAccent;
+}
+
 export interface DashboardSnapshot {
   header: DashboardHeader;
   kpis: DashboardKpiCard[];
   chatSla?: DashboardChatSla;
+  atendimento?: {
+    title: string;
+    status: string;
+    note: string;
+    metrics: DashboardKpiCard[];
+    backlog: {
+      title: string;
+      trailing: string;
+      rows: DashboardEfficiencyRow[];
+    };
+    agents: {
+      title: string;
+      columns: string[];
+      rows: DashboardAtendimentoAgentRow[];
+    };
+  };
+  operacao?: {
+    title: string;
+    status: string;
+    note: string;
+    metrics: DashboardKpiCard[];
+    stages: {
+      title: string;
+      trailing: string;
+      rows: DashboardEfficiencyRow[];
+    };
+    owners: {
+      title: string;
+      columns: string[];
+      rows: DashboardOperacaoOwnerRow[];
+    };
+  };
+  financeiro?: {
+    title: string;
+    status: string;
+    note: string;
+    metrics: DashboardKpiCard[];
+    breakdown: {
+      title: string;
+      trailing: string;
+      rows: DashboardEfficiencyRow[];
+    };
+    owners: {
+      title: string;
+      columns: string[];
+      rows: DashboardFinanceiroOwnerRow[];
+    };
+  };
   efficiency: {
     title: string;
     trailing: string;

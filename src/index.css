@@ -28,6 +28,12 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   color-scheme: dark;
   margin: 0;
@@ -81,6 +87,7 @@ body::before {
 
 .dashboard-root.dashboard-fullscreen {
   height: 100vh;
+  min-height: 100vh;
   width: 100vw;
   overflow: hidden;
   display: flex;
@@ -94,6 +101,7 @@ body::before {
   overflow: hidden;
   padding: 0.8rem;
   min-height: 0;
+  height: 100%;
 }
 
 .reference-static-layout {
@@ -113,7 +121,7 @@ body::before {
 .reference-main-grid {
   flex: 1;
   min-height: 0;
-  height: auto;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -145,6 +153,7 @@ body::before {
 
 .reference-panel-main-fill {
   flex: 1 1 0;
+  min-height: 0;
 }
 
 .reference-panel-main-sla {
@@ -748,6 +757,117 @@ body.dashboard-theme-light {
   z-index: 1;
 }
 
+.reference-dashboard-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 0.95rem;
+  align-items: stretch;
+  min-height: 100%;
+  height: 100%;
+}
+
+.reference-content-area {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.reference-sidebar-shell {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+  height: 100%;
+  padding: 0.9rem 0.8rem;
+}
+
+.reference-sidebar-head {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.reference-sidebar-brand {
+  color: #f3f5f6;
+  font-family: var(--font-display);
+  font-size: 1.34rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+.reference-sidebar-caption {
+  color: rgba(216, 227, 232, 0.52);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.reference-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.reference-sidebar-button {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  padding: 0.78rem 0.82rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(14, 15, 18, 0.94), rgba(10, 11, 13, 0.92)),
+    radial-gradient(circle at left center, rgba(255, 255, 255, 0.025), transparent 36%);
+  color: rgba(232, 238, 240, 0.74);
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.reference-sidebar-button:hover {
+  border-color: rgba(38, 208, 124, 0.2);
+  color: #f4f7f8;
+  transform: translateX(2px);
+}
+
+.reference-sidebar-button.is-active {
+  border-color: rgba(38, 208, 124, 0.34);
+  background:
+    linear-gradient(180deg, rgba(14, 21, 17, 0.96), rgba(9, 13, 11, 0.94)),
+    radial-gradient(circle at left center, rgba(38, 208, 124, 0.12), transparent 40%);
+  color: #8cf1bd;
+  box-shadow: inset 0 0 0 1px rgba(38, 208, 124, 0.08);
+}
+
+.reference-sidebar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.reference-sidebar-button.is-active .reference-sidebar-icon {
+  border-color: rgba(38, 208, 124, 0.22);
+  background: rgba(38, 208, 124, 0.08);
+}
+
 .reference-shell,
 .reference-panel,
 .reference-kpi-card,
@@ -838,8 +958,8 @@ body.dashboard-theme-light {
   font-family: var(--font-display);
   font-size: clamp(1.82rem, 2.5vw, 2.42rem);
   font-weight: 800;
-  letter-spacing: -0.055em;
-  line-height: 0.98;
+  letter-spacing: -0.032em;
+  line-height: 1.02;
 }
 
 .reference-slash {
@@ -849,10 +969,10 @@ body.dashboard-theme-light {
 
 .reference-context {
   color: #26d07c;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.2em;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -881,9 +1001,10 @@ body.dashboard-theme-light {
 
 .reference-live-label {
   color: rgba(216, 227, 232, 0.52);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -892,7 +1013,7 @@ body.dashboard-theme-light {
   font-family: var(--font-display);
   font-size: 1.12rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.015em;
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
@@ -911,6 +1032,8 @@ body.dashboard-theme-light {
   gap: 0.95rem;
   grid-template-columns: minmax(0, 1.72fr) minmax(320px, 0.78fr);
   align-items: stretch;
+  height: 100%;
+  min-height: 0;
 }
 
 .reference-main-column,
@@ -983,10 +1106,10 @@ body.dashboard-theme-light {
 
 .reference-kpi-label {
   color: rgba(232, 238, 240, 0.56);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -995,8 +1118,8 @@ body.dashboard-theme-light {
   font-family: var(--font-display);
   font-size: clamp(1.6rem, 2.65vw, 2.1rem);
   font-weight: 800;
-  letter-spacing: -0.045em;
-  line-height: 1;
+  letter-spacing: -0.02em;
+  line-height: 1.02;
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
@@ -1030,7 +1153,7 @@ body.dashboard-theme-light {
   font-family: var(--font-display);
   font-size: 1.02rem;
   font-weight: 700;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.02em;
 }
 
 .reference-panel-head p {
@@ -1041,9 +1164,10 @@ body.dashboard-theme-light {
 
 .reference-panel-trailing {
   color: rgba(232, 238, 240, 0.4);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.12em;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -1163,10 +1287,10 @@ body.dashboard-theme-light {
 
 .reference-mix-label {
   color: var(--reference-accent);
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -1179,9 +1303,10 @@ body.dashboard-theme-light {
 
 .reference-mix-value small {
   color: rgba(232, 238, 240, 0.48);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.14em;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -2148,8 +2273,8 @@ body.dashboard-theme-light .reference-eyebrow {
 }
 
 .reference-panel-side-mix {
-  flex-basis: 320px;
-  min-height: 320px;
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 .reference-panel-side-sla {
@@ -2159,7 +2284,7 @@ body.dashboard-theme-light .reference-eyebrow {
 
 .reference-panel-side-hero {
   flex: 1 1 0;
-  min-height: 360px;
+  min-height: 0;
 }
 
 .reference-panel-side-hero.reference-panel-side-hero-list {
@@ -2297,8 +2422,12 @@ body.dashboard-theme-light .reference-eyebrow {
   border-radius: 16px;
   border: 1px solid var(--reference-accent-border, rgba(255, 255, 255, 0.08));
   background:
+    linear-gradient(90deg, var(--reference-accent-soft), transparent 18%),
     linear-gradient(180deg, rgba(14, 15, 18, 0.96), rgba(10, 11, 13, 0.94)),
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.03), transparent 32%);
+    radial-gradient(circle at top right, var(--reference-accent-soft), transparent 42%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 16px 28px rgba(0, 0, 0, 0.2);
 }
 
 .reference-panel-side-hero .reference-opportunity-card-pro:first-child {
@@ -2338,9 +2467,10 @@ body.dashboard-theme-light .reference-eyebrow {
 .reference-opportunity-head p {
   margin: 0.45rem 0 0;
   color: rgba(216, 227, 232, 0.56);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
@@ -2350,6 +2480,7 @@ body.dashboard-theme-light .reference-eyebrow {
 .reference-opportunity-tag {
   gap: 0.35rem;
   flex-shrink: 0;
+  border: 1px solid var(--reference-accent-border, rgba(255, 255, 255, 0.08));
 }
 
 .reference-opportunity-metric {
@@ -2362,9 +2493,10 @@ body.dashboard-theme-light .reference-eyebrow {
 
 .reference-opportunity-metric span {
   color: rgba(232, 238, 240, 0.5);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -2373,7 +2505,7 @@ body.dashboard-theme-light .reference-eyebrow {
   font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 800;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.024em;
   line-height: 1;
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
@@ -2388,10 +2520,10 @@ body.dashboard-theme-light .reference-eyebrow {
 
 .reference-opportunity-probability span {
   color: var(--reference-accent);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .reference-opportunity-track,
@@ -2400,7 +2532,7 @@ body.dashboard-theme-light .reference-eyebrow {
   height: 0.45rem;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: linear-gradient(90deg, var(--reference-accent-soft), rgba(255, 255, 255, 0.08));
 }
 
 .reference-opportunity-fill,
@@ -2417,9 +2549,10 @@ body.dashboard-theme-light .reference-eyebrow {
 
 .reference-opportunity-foot span {
   color: rgba(232, 238, 240, 0.62);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -2480,10 +2613,10 @@ body.dashboard-theme-light .reference-eyebrow {
 
 .reference-mix-label {
   color: var(--reference-accent);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -2492,19 +2625,35 @@ body.dashboard-theme-light .reference-eyebrow {
   font-family: var(--font-display);
   font-size: 1.18rem;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.018em;
   font-variant-numeric: tabular-nums lining-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
 
 .reference-mix-value small {
   color: rgba(216, 227, 232, 0.55);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.12em;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
 }
 
 @media (max-width: 1280px) {
+  .reference-dashboard-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .reference-sidebar-shell {
+    position: relative;
+    top: auto;
+    min-height: 0;
+  }
+
+  .reference-sidebar-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .reference-kpi-strip-pro {
     grid-template-columns: 1fr;
   }
@@ -2517,6 +2666,10 @@ body.dashboard-theme-light .reference-eyebrow {
 }
 
 @media (max-width: 900px) {
+  .reference-sidebar-nav {
+    grid-template-columns: 1fr;
+  }
+
   .reference-panel-side-hero .reference-opportunity-list {
     grid-template-columns: 1fr;
   }

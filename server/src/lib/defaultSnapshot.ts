@@ -3,20 +3,20 @@ import type { DashboardSnapshot } from "../schemas/dashboard.js";
 export const DEFAULT_DASHBOARD_SNAPSHOT: DashboardSnapshot = {
   header: {
     brand: "ALEM DA IDEIA",
-    context: "COMMERCIAL INTELLIGENCE",
-    subtitle: "ANALISE DE MIX, ORIGEM E PERFORMANCE HIGH-TICKET",
+    context: "INTELIGÊNCIA COMERCIAL",
+    subtitle: "ANÁLISE DE MIX, ORIGEM E PERFORMANCE HIGH-TICKET",
     liveMetricLabel: "LTV ESTIMADO",
     liveMetricValue: "R$ 14.2M",
     status: "BRADTAIL CHAT: ATIVO",
   },
   kpis: [
     {
-      label: "TICKET MEDIO (GERAL)",
+      label: "TICKET MÉDIO (GERAL)",
       value: "R$ 140.000",
       accent: "emerald",
     },
     {
-      label: "BEST-SELLER (VOLUME)",
+      label: "PRODUTO LÍDER (VOLUME)",
       value: "Conselheiro",
       accent: "violet",
     },
@@ -27,7 +27,7 @@ export const DEFAULT_DASHBOARD_SNAPSHOT: DashboardSnapshot = {
     },
   ],
   chatSla: {
-    title: "SLA Bradial Chat",
+    title: "SLA do Chat Bradial",
     value: "1m 42s",
     note: "82% dentro da meta em 24 conversas",
     status: "IN SLA",
@@ -38,6 +38,303 @@ export const DEFAULT_DASHBOARD_SNAPSHOT: DashboardSnapshot = {
     compliancePct: 82,
     sampleSize: 24,
     waitingCount: 3,
+  },
+  atendimento: {
+    title: "Atendimento Bradial",
+    status: "ATENDIMENTO AO VIVO",
+    note: "Janela de hoje com backlog e produtividade por agente",
+    metrics: [
+      {
+        label: "CONVERSAS HOJE",
+        value: "24",
+        note: "criadas desde 00:00",
+        accent: "emerald",
+      },
+      {
+        label: "CONVERSAS ATIVAS",
+        value: "57",
+        note: "com atividade hoje",
+        accent: "blue",
+      },
+      {
+        label: "ABERTAS AGORA",
+        value: "18",
+        note: "4 sem agente",
+        accent: "amber",
+      },
+      {
+        label: "MSGS ENVIADAS",
+        value: "142",
+        note: "por agentes hoje",
+        accent: "violet",
+      },
+      {
+        label: "MSGS RECEBIDAS",
+        value: "119",
+        note: "de contatos hoje",
+        accent: "rose",
+      },
+      {
+        label: "RESOLVIDAS HOJE",
+        value: "39",
+        note: "finalizadas na janela",
+        accent: "emerald",
+      },
+    ],
+    backlog: {
+      title: "Backlog do Atendimento",
+      trailing: "ABERTAS AGORA: 18",
+      rows: [
+        {
+          label: "Fila aguardando",
+          note: "11 conversas",
+          progress: 61,
+          accent: "amber",
+        },
+        {
+          label: "Nao lidas",
+          note: "7 conversas • 19 mensagens",
+          progress: 39,
+          accent: "rose",
+        },
+        {
+          label: "Espera acima de 1h",
+          note: "3 conversas",
+          progress: 27,
+          accent: "rose",
+        },
+        {
+          label: "Abertas sem agente",
+          note: "4 conversas",
+          progress: 22,
+          accent: "blue",
+        },
+      ],
+    },
+    agents: {
+      title: "Produtividade por Agente",
+      columns: ["Agente", "Msgs enviadas", "Ativas", "Novas"],
+      rows: [
+        {
+          name: "Kaue Bordignon",
+          messages: "48",
+          messagesValue: 48,
+          activeConversations: "12",
+          activeConversationsValue: 12,
+          newConversations: "5",
+          newConversationsValue: 5,
+          accent: "emerald",
+        },
+        {
+          name: "Thomas Silva",
+          messages: "33",
+          messagesValue: 33,
+          activeConversations: "9",
+          activeConversationsValue: 9,
+          newConversations: "3",
+          newConversationsValue: 3,
+          accent: "amber",
+        },
+      ],
+    },
+  },
+  operacao: {
+    title: "Operação ClickUp",
+    status: "CLICKUP AO VIVO",
+    note: "Panorama operacional das tasks monitoradas no ClickUp, com foco em andamento, travas e carga por responsavel.",
+    metrics: [
+      {
+        label: "TAREFAS MONITORADAS",
+        value: "161",
+        note: "universo atual do escopo",
+        accent: "emerald",
+      },
+      {
+        label: "ATIVAS",
+        value: "94",
+        note: "em aberto no momento",
+        accent: "blue",
+      },
+      {
+        label: "PARADAS 7D+",
+        value: "21",
+        note: "sem atualizacao recente",
+        accent: "rose",
+      },
+      {
+        label: "ATUALIZADAS 48H",
+        value: "37",
+        note: "movimento recente",
+        accent: "violet",
+      },
+      {
+        label: "CONCLUIDAS",
+        value: "46",
+        note: "ganhas ou encerradas",
+        accent: "amber",
+      },
+      {
+        label: "SEM RESPONSÁVEL",
+        value: "8",
+        note: "pedem triagem",
+        accent: "rose",
+      },
+    ],
+    stages: {
+      title: "Andamento por Etapa",
+      trailing: "STATUS DO CLICKUP",
+      rows: [
+        {
+          label: "Em qualificacao",
+          note: "28 tasks",
+          progress: 62,
+          accent: "amber",
+        },
+        {
+          label: "Oportunidade",
+          note: "22 tasks",
+          progress: 49,
+          accent: "emerald",
+        },
+        {
+          label: "Reuniao agendada",
+          note: "14 tasks",
+          progress: 31,
+          accent: "blue",
+        },
+        {
+          label: "Followup",
+          note: "11 tasks",
+          progress: 24,
+          accent: "violet",
+        },
+      ],
+    },
+    owners: {
+      title: "Carga por Responsável",
+      columns: ["Responsável", "Ativas", "Paradas 7d+", "Concluídas"],
+      rows: [
+        {
+          name: "Kaue Bordignon",
+          active: "38",
+          activeValue: 38,
+          stalled: "9",
+          stalledValue: 9,
+          closed: "11",
+          closedValue: 11,
+          accent: "emerald",
+        },
+        {
+          name: "Thomas Silva",
+          active: "19",
+          activeValue: 19,
+          stalled: "4",
+          stalledValue: 4,
+          closed: "8",
+          closedValue: 8,
+          accent: "amber",
+        },
+      ],
+    },
+  },
+  financeiro: {
+    title: "Financeiro Comercial",
+    status: "PREVISÃO COMERCIAL",
+    note: "Leitura financeira derivada do pipeline comercial no ClickUp, sem fonte contábil externa.",
+    metrics: [
+      {
+        label: "FUNIL TOTAL",
+        value: "R$ 2.33M",
+        note: "oportunidades ativas com valor",
+        accent: "emerald",
+      },
+      {
+        label: "PREVISÃO PONDERADA",
+        value: "R$ 1.18M",
+        note: "valor x probabilidade por etapa",
+        accent: "blue",
+      },
+      {
+        label: "GANHO",
+        value: "R$ 480k",
+        note: "negocios marcados como ganhos",
+        accent: "amber",
+      },
+      {
+        label: "PERDIDO",
+        value: "R$ 190k",
+        note: "valor perdido no funil",
+        accent: "rose",
+      },
+      {
+        label: "TICKET MÉDIO",
+        value: "R$ 140k",
+        note: "negocios com valor",
+        accent: "violet",
+      },
+      {
+        label: "VALOR PARADO 7D+",
+        value: "R$ 620k",
+        note: "pipeline sem atualizacao recente",
+        accent: "rose",
+      },
+    ],
+    breakdown: {
+      title: "Receita por Etapa",
+      trailing: "FUNIL COMERCIAL",
+      rows: [
+        {
+          label: "Oportunidade",
+          note: "R$ 1.05M • 18 negocios",
+          progress: 100,
+          accent: "emerald",
+        },
+        {
+          label: "Em qualificacao",
+          note: "R$ 640k • 11 negocios",
+          progress: 61,
+          accent: "amber",
+        },
+        {
+          label: "Reuniao agendada",
+          note: "R$ 370k • 6 negocios",
+          progress: 35,
+          accent: "blue",
+        },
+        {
+          label: "Followup",
+          note: "R$ 270k • 4 negocios",
+          progress: 26,
+          accent: "violet",
+        },
+      ],
+    },
+    owners: {
+      title: "Financeiro por Responsável",
+      columns: ["Responsável", "Funil", "Previsão", "Ganho"],
+      rows: [
+        {
+          name: "Kaue Bordignon",
+          pipeline: "R$ 980k",
+          pipelineValue: 980000,
+          forecast: "R$ 510k",
+          forecastValue: 510000,
+          won: "R$ 180k",
+          wonValue: 180000,
+          accent: "emerald",
+        },
+        {
+          name: "Thomas Silva",
+          pipeline: "R$ 520k",
+          pipelineValue: 520000,
+          forecast: "R$ 260k",
+          forecastValue: 260000,
+          won: "R$ 90k",
+          wonValue: 90000,
+          accent: "amber",
+        },
+      ],
+    },
   },
   efficiency: {
     title: "Eficiencia por Origem (SDR)",
@@ -71,7 +368,7 @@ export const DEFAULT_DASHBOARD_SNAPSHOT: DashboardSnapshot = {
   },
   squad: {
     title: "Elite Squad Performance",
-    columns: ["Consultor", "Atendimentos", "Chats Bradial", "SLA BRADTAIL", "VOLUME VENDAS"],
+    columns: ["Consultor", "Leads atribuídos", "Chats Bradial", "SLA BRADTAIL", "VOLUME VENDAS"],
     rows: [
       {
         name: "Kaue Bordignon",
@@ -126,7 +423,7 @@ export const DEFAULT_DASHBOARD_SNAPSHOT: DashboardSnapshot = {
     ],
   },
   opportunities: {
-    title: "Top Opportunities",
+    title: "Principais Oportunidades",
     rows: [
       {
         title: "Grupo Votorantim",

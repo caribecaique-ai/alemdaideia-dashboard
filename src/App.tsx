@@ -5,10 +5,13 @@ import {
   subscribeDashboardSnapshotStream,
 } from "./services/dashboardSource";
 import type {
+  DashboardAtendimentoAgentRow,
   DashboardChatSla,
   DashboardEfficiencyRow,
+  DashboardFinanceiroOwnerRow,
   DashboardKpiCard,
   DashboardMixRow,
+  DashboardOperacaoOwnerRow,
   DashboardOpportunity,
   DashboardSnapshot,
   DashboardSquadRow,
@@ -27,6 +30,15 @@ type IconName =
   | "mix"
   | "team"
   | "deal";
+
+type DashboardSectionId =
+  | "commercial"
+  | "atendimento"
+  | "operacao"
+  | "financeiro"
+  | "marketing"
+  | "pos-venda"
+  | "pessoas";
 
 const referenceAccentStyles: Record<ReferenceAccent, { accent: string; soft: string; border: string }> = {
   emerald: {
@@ -56,8 +68,33 @@ const referenceAccentStyles: Record<ReferenceAccent, { accent: string; soft: str
   },
 };
 
+function resolveOpportunityAccent(status: string, fallbackAccent: ReferenceAccent): ReferenceAccent {
+  const normalized = normalizeText(status);
+
+  if (normalized.includes("qualific")) return "amber";
+  if (normalized.includes("oportun")) return "emerald";
+  if (normalized.includes("follow")) return "violet";
+  if (normalized.includes("reuniao agendada") || normalized.includes("agendada")) return "blue";
+  if (normalized.includes("president")) return "amber";
+  if (normalized.includes("conselh")) return "blue";
+  if (normalized.includes("embaix")) return "violet";
+
+  return fallbackAccent;
+}
+
+const dashboardSections: Array<{ id: DashboardSectionId; label: string; icon: IconName }> = [
+  { id: "commercial", label: "Comercial", icon: "deal" },
+  { id: "atendimento", label: "Atendimento", icon: "pulse" },
+  { id: "operacao", label: "Operação", icon: "target" },
+  { id: "financeiro", label: "Financeiro", icon: "coins" },
+  { id: "marketing", label: "Marketing", icon: "trend" },
+  { id: "pos-venda", label: "Pós-venda", icon: "shield" },
+  { id: "pessoas", label: "Pessoas", icon: "team" },
+];
+
 function App() {
   const [dashboard, setDashboard] = useState<DashboardSnapshot>(ALEMDAIDEIA_DASHBOARD_MOCK);
+  const [activeSection, setActiveSection] = useState<DashboardSectionId>("commercial");
 
   useEffect(() => {
     let isMounted = true;
@@ -124,140 +161,644 @@ function App() {
   const presentation = buildPresentationSnapshot(dashboard);
   const mixMaxValue = presentation.mix.rows.reduce((max, row) => Math.max(max, row.value), 0);
   const opportunitiesListMode = presentation.opportunities.rows.length > 4;
+  const activeSectionDefinition =
+    dashboardSections.find((section) => section.id === activeSection) || dashboardSections[0];
+  const sectionHeader = buildSectionHeader(activeSection, presentation, activeSectionDefinition.label);
 
   return (
     <div className="dashboard-root dashboard-static dashboard-fullscreen text-slate-100">
       <main className="dashboard-shell dashboard-shell-fullscreen">
-        <div className="reference-static-layout reference-static-layout-pro">
-          <header className="reference-shell reference-header-shell dashboard-header-shell reference-header-shell-pro">
-            <div className="reference-topbar">
-              <div className="reference-brand">
-                <div className="reference-badge">
-                  <GlyphIcon name="spark" />
-                  <span>Executive Live View</span>
-                </div>
-                <div className="reference-title-row">
-                  <h1 className="reference-title">{presentation.header.brand}</h1>
-                  <span className="reference-slash">/</span>
-                  <span className="reference-context">{presentation.header.context}</span>
-                </div>
-                <p className="reference-subtitle">{presentation.header.subtitle}</p>
+        <div className="reference-dashboard-layout">
+          <aside className="reference-shell reference-sidebar-shell">
+            <div className="reference-sidebar-head">
+              <div className="reference-badge">
+                <GlyphIcon name="spark" />
+                <span>Visão Executiva ao Vivo</span>
               </div>
-
-              <div className="reference-head-actions">
-                <div className="reference-live-metric reference-live-metric-pro">
-                  <span className="reference-live-label">{presentation.header.liveMetricLabel}</span>
-                  <strong>{presentation.header.liveMetricValue}</strong>
-                </div>
-                <div className="reference-status-pill reference-status-pill-pro">
-                  <GlyphIcon name="shield" />
-                  <span>{presentation.header.status}</span>
-                </div>
-              </div>
+              <div className="reference-sidebar-brand">Além da Ideia</div>
+              <div className="reference-sidebar-caption">Mapa de navegação</div>
             </div>
-          </header>
 
-          <section className="reference-main-grid">
-            <div className="reference-main-column">
-              <div className="reference-kpi-strip reference-kpi-strip-pro">
-                {presentation.kpis.map((card) => (
-                  <ReferenceKpiCard key={card.label} {...card} />
-                ))}
-              </div>
-
-              <ReferencePanel
-                title={presentation.efficiency.title}
-                iconName="target"
-                accent="violet"
-                trailing={presentation.efficiency.trailing}
-                className="reference-panel-flex reference-panel-main-compact"
-              >
-                <div className="reference-lane-list reference-scroll-list">
-                  {presentation.efficiency.rows.map((row) => (
-                    <ReferenceEfficiencyRow key={row.label} {...row} />
-                  ))}
-                </div>
-              </ReferencePanel>
-
-              <ReferencePanel
-                  title={presentation.squad.title}
-                  iconName="team"
-                  accent="emerald"
-                  trailing={presentation.header.status}
-                  className="reference-panel-flex reference-panel-main-fill"
-              >
-                <div className="reference-table-wrap reference-scroll-list">
-                  <table className="reference-table reference-table-pro w-full min-w-[760px]">
-                    <thead>
-                      <tr>
-                        {presentation.squad.columns.map((column) => (
-                          <th key={column}>{column}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {presentation.squad.rows.map((item) => (
-                        <ReferenceSquadRowView
-                          key={item.name}
-                          item={item}
-                          targetSeconds={presentation.chatSla?.targetSeconds}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </ReferencePanel>
-
-              {presentation.chatSla ? (
-                <ReferencePanel
-                  title={presentation.chatSla.title}
-                  iconName="pulse"
-                  accent={presentation.chatSla.accent}
-                  trailing={presentation.chatSla.status}
-                  className="reference-panel-flex reference-panel-main-sla"
+            <nav className="reference-sidebar-nav" aria-label="Navegação do dashboard">
+              {dashboardSections.map((section) => (
+                <button
+                  key={section.id}
+                  type="button"
+                  className={`reference-sidebar-button ${activeSection === section.id ? "is-active" : ""}`.trim()}
+                  aria-current={activeSection === section.id ? "page" : undefined}
+                  onClick={() => setActiveSection(section.id)}
                 >
-                  <ReferenceChatSlaCard {...presentation.chatSla} />
-                </ReferencePanel>
-              ) : null}
-            </div>
+                  <span className="reference-sidebar-icon">
+                    <GlyphIcon name={section.icon} size={16} />
+                  </span>
+                  <span>{section.label}</span>
+                </button>
+              ))}
+            </nav>
+          </aside>
 
-            <div className="reference-side-column">
-              <ReferencePanel
-                title={presentation.mix.title}
-                iconName="mix"
-                accent="amber"
-                className="reference-panel-flex reference-panel-side-compact reference-panel-side-mix"
-              >
-                <div className="reference-mix-list reference-scroll-list">
-                  {presentation.mix.rows.map((row) => (
-                    <ReferenceMixRow key={row.label} {...row} maxValue={mixMaxValue} />
-                  ))}
-                </div>
-              </ReferencePanel>
+          <div className="reference-content-area">
+            <div className="reference-static-layout reference-static-layout-pro">
+              <header className="reference-shell reference-header-shell dashboard-header-shell reference-header-shell-pro">
+                <div className="reference-topbar">
+                  <div className="reference-brand">
+                    <div className="reference-badge">
+                      <GlyphIcon name="spark" />
+                      <span>Visão Executiva ao Vivo</span>
+                    </div>
+                    <div className="reference-title-row">
+                      <h1 className="reference-title">{sectionHeader.brand}</h1>
+                      <span className="reference-slash">/</span>
+                      <span className="reference-context">{sectionHeader.context}</span>
+                    </div>
+                    <p className="reference-subtitle">{sectionHeader.subtitle}</p>
+                  </div>
 
-              <ReferencePanel
-                title={presentation.opportunities.title}
-                iconName="crown"
-                accent="amber"
-                className={`reference-panel-flex reference-panel-side-hero ${
-                  opportunitiesListMode ? "reference-panel-side-hero-list" : ""
-                }`.trim()}
-              >
-                <div
-                  className={`reference-opportunity-list reference-scroll-list ${
-                    opportunitiesListMode ? "reference-opportunity-list-list" : ""
-                  }`.trim()}
-                >
-                  {presentation.opportunities.rows.map((task) => (
-                    <ReferenceOpportunityCard key={task.title} {...task} compact={opportunitiesListMode} />
-                  ))}
+                  <div className="reference-head-actions">
+                    <div className="reference-live-metric reference-live-metric-pro">
+                      <span className="reference-live-label">{sectionHeader.liveMetricLabel}</span>
+                      <strong>{sectionHeader.liveMetricValue}</strong>
+                    </div>
+                    <div className="reference-status-pill reference-status-pill-pro">
+                      <GlyphIcon name="shield" />
+                      <span>{sectionHeader.status}</span>
+                    </div>
+                  </div>
                 </div>
-              </ReferencePanel>
+              </header>
+
+              {activeSection === "commercial" ? (
+                <ReferenceCommercialSection
+                  presentation={presentation}
+                  mixMaxValue={mixMaxValue}
+                  opportunitiesListMode={opportunitiesListMode}
+                />
+              ) : activeSection === "atendimento" && presentation.atendimento ? (
+                <ReferenceAtendimentoSection
+                  atendimento={presentation.atendimento}
+                  chatSla={presentation.chatSla}
+                />
+              ) : activeSection === "operacao" && presentation.operacao ? (
+                <ReferenceOperacaoSection operacao={presentation.operacao} />
+              ) : activeSection === "financeiro" && presentation.financeiro ? (
+                <ReferenceFinanceiroSection financeiro={presentation.financeiro} />
+              ) : (
+                <ReferenceSectionPlaceholder label={activeSectionDefinition.label} />
+              )}
             </div>
-          </section>
+          </div>
         </div>
       </main>
     </div>
+  );
+}
+
+function buildSectionHeader(
+  sectionId: DashboardSectionId,
+  snapshot: DashboardSnapshot,
+  sectionLabel: string,
+): DashboardSnapshot["header"] {
+  if (sectionId === "atendimento" && snapshot.atendimento) {
+    const liveMetric = snapshot.atendimento.metrics[0];
+    return {
+      brand: snapshot.header.brand,
+      context: "ATENDIMENTO OPERACIONAL",
+      subtitle: snapshot.atendimento.note,
+      liveMetricLabel: liveMetric?.label || "CONVERSAS HOJE",
+      liveMetricValue: liveMetric?.value || "--",
+      status: snapshot.atendimento.status,
+    };
+  }
+
+  if (sectionId === "operacao" && snapshot.operacao) {
+    const liveMetric = snapshot.operacao.metrics[2] || snapshot.operacao.metrics[0];
+    return {
+      brand: snapshot.header.brand,
+      context: "OPERAÇÕES DO CLICKUP",
+      subtitle: snapshot.operacao.note,
+      liveMetricLabel: liveMetric?.label || "TAREFAS MONITORADAS",
+      liveMetricValue: liveMetric?.value || "--",
+      status: snapshot.operacao.status,
+    };
+  }
+
+  if (sectionId === "financeiro" && snapshot.financeiro) {
+    const liveMetric = snapshot.financeiro.metrics[1] || snapshot.financeiro.metrics[0];
+    return {
+      brand: snapshot.header.brand,
+      context: "FINANCEIRO COMERCIAL",
+      subtitle: snapshot.financeiro.note,
+      liveMetricLabel: liveMetric?.label || "PIPELINE TOTAL",
+      liveMetricValue: liveMetric?.value || "--",
+      status: snapshot.financeiro.status,
+    };
+  }
+
+  if (sectionId !== "commercial") {
+    return {
+      brand: snapshot.header.brand,
+      context: `${sectionLabel.toUpperCase()} / EM ESTUDO`,
+      subtitle: "Módulo reservado no mapa de navegação do dashboard.",
+      liveMetricLabel: snapshot.header.liveMetricLabel,
+      liveMetricValue: snapshot.header.liveMetricValue,
+      status: "EM ESTUDO",
+    };
+  }
+
+  return snapshot.header;
+}
+
+function ReferenceCommercialSection({
+  presentation,
+  mixMaxValue,
+  opportunitiesListMode,
+}: {
+  presentation: DashboardSnapshot;
+  mixMaxValue: number;
+  opportunitiesListMode: boolean;
+}) {
+  return (
+    <section className="reference-main-grid">
+      <div className="reference-main-column">
+        <div className="reference-kpi-strip reference-kpi-strip-pro">
+          {presentation.kpis.map((card) => (
+            <ReferenceKpiCard key={card.label} {...card} />
+          ))}
+        </div>
+
+        <ReferencePanel
+          title={presentation.efficiency.title}
+          iconName="target"
+          accent="violet"
+          trailing={presentation.efficiency.trailing}
+          className="reference-panel-flex reference-panel-main-compact"
+        >
+          <div className="reference-lane-list reference-scroll-list">
+            {presentation.efficiency.rows.map((row) => (
+              <ReferenceEfficiencyRow key={row.label} {...row} />
+            ))}
+          </div>
+        </ReferencePanel>
+
+        <ReferencePanel
+          title={presentation.squad.title}
+          iconName="team"
+          accent="emerald"
+          trailing={presentation.header.status}
+          className="reference-panel-flex reference-panel-main-fill"
+        >
+          <div className="reference-table-wrap reference-scroll-list">
+            <table className="reference-table reference-table-pro w-full min-w-[760px]">
+              <thead>
+                <tr>
+                  {presentation.squad.columns.map((column) => (
+                    <th key={column}>{column}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {presentation.squad.rows.map((item) => (
+                  <ReferenceSquadRowView
+                    key={item.name}
+                    item={item}
+                    targetSeconds={presentation.chatSla?.targetSeconds}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ReferencePanel>
+
+        {presentation.chatSla ? (
+          <ReferencePanel
+            title={presentation.chatSla.title}
+            iconName="pulse"
+            accent={presentation.chatSla.accent}
+            trailing={presentation.chatSla.status}
+            className="reference-panel-flex reference-panel-main-sla"
+          >
+            <ReferenceChatSlaCard {...presentation.chatSla} />
+          </ReferencePanel>
+        ) : null}
+      </div>
+
+      <div className="reference-side-column">
+        <ReferencePanel
+          title={presentation.mix.title}
+          iconName="mix"
+          accent="amber"
+          className="reference-panel-flex reference-panel-side-compact reference-panel-side-mix"
+        >
+          <div className="reference-mix-list reference-scroll-list">
+            {presentation.mix.rows.map((row) => (
+              <ReferenceMixRow key={row.label} {...row} maxValue={mixMaxValue} />
+            ))}
+          </div>
+        </ReferencePanel>
+
+        <ReferencePanel
+          title={presentation.opportunities.title}
+          iconName="crown"
+          accent="amber"
+          className={`reference-panel-flex reference-panel-side-hero ${
+            opportunitiesListMode ? "reference-panel-side-hero-list" : ""
+          }`.trim()}
+        >
+          <div
+            className={`reference-opportunity-list reference-scroll-list ${
+              opportunitiesListMode ? "reference-opportunity-list-list" : ""
+            }`.trim()}
+          >
+            {presentation.opportunities.rows.map((task) => (
+              <ReferenceOpportunityCard
+                key={task.title}
+                {...task}
+                compact={opportunitiesListMode}
+              />
+            ))}
+          </div>
+        </ReferencePanel>
+      </div>
+    </section>
+  );
+}
+
+function ReferenceAtendimentoSection({
+  atendimento,
+  chatSla,
+}: {
+  atendimento: NonNullable<DashboardSnapshot["atendimento"]>;
+  chatSla?: DashboardChatSla;
+}) {
+  return (
+    <section className="reference-main-grid">
+      <div className="reference-main-column">
+        <div className="reference-kpi-strip reference-kpi-strip-pro">
+          {atendimento.metrics.map((card) => (
+            <ReferenceKpiCard key={card.label} {...card} />
+          ))}
+        </div>
+
+        <ReferencePanel
+          title={atendimento.backlog.title}
+          iconName="pulse"
+          accent="amber"
+          trailing={atendimento.backlog.trailing}
+          className="reference-panel-flex reference-panel-main-compact"
+        >
+          <div className="reference-lane-list reference-scroll-list">
+            {atendimento.backlog.rows.map((row) => (
+              <ReferenceEfficiencyRow key={row.label} {...row} />
+            ))}
+          </div>
+        </ReferencePanel>
+
+        <ReferencePanel
+          title={atendimento.agents.title}
+          iconName="team"
+          accent="blue"
+          trailing={atendimento.status}
+          className="reference-panel-flex reference-panel-main-fill"
+        >
+          {atendimento.agents.rows.length ? (
+            <div className="reference-table-wrap reference-scroll-list">
+              <table className="reference-table reference-table-pro w-full min-w-[760px]">
+                <thead>
+                  <tr>
+                    {atendimento.agents.columns.map((column) => (
+                      <th key={column}>{column}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {atendimento.agents.rows.map((item) => (
+                    <ReferenceAtendimentoAgentRowView key={item.name} item={item} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                minHeight: "180px",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "1.25rem",
+                color: "rgba(228, 236, 240, 0.72)",
+                textAlign: "center",
+              }}
+            >
+              Nenhuma atividade de agente encontrada na janela atual.
+            </div>
+          )}
+        </ReferencePanel>
+      </div>
+
+      <div className="reference-side-column">
+        <ReferencePanel
+          title="Resumo do Atendimento"
+          iconName="calendar"
+          accent="violet"
+          trailing={atendimento.status}
+          className="reference-panel-flex reference-panel-side-hero"
+        >
+          <div
+            style={{
+              display: "grid",
+              gap: "0.75rem",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                color: "rgba(228, 236, 240, 0.76)",
+                fontSize: "0.9rem",
+                lineHeight: 1.6,
+              }}
+            >
+              {atendimento.note}
+            </p>
+            {atendimento.metrics.slice(0, 4).map((metric) => (
+              <SlaMetaItem key={metric.label} label={metric.label} value={`${metric.value} ${metric.note || ""}`.trim()} />
+            ))}
+          </div>
+        </ReferencePanel>
+
+        {chatSla ? (
+          <ReferencePanel
+            title={chatSla.title}
+            iconName="pulse"
+            accent={chatSla.accent}
+            trailing={chatSla.status}
+            className="reference-panel-flex reference-panel-side-sla"
+          >
+            <ReferenceChatSlaCard {...chatSla} />
+          </ReferencePanel>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function ReferenceOperacaoSection({
+  operacao,
+}: {
+  operacao: NonNullable<DashboardSnapshot["operacao"]>;
+}) {
+  return (
+    <section className="reference-main-grid">
+      <div className="reference-main-column">
+        <div className="reference-kpi-strip reference-kpi-strip-pro">
+          {operacao.metrics.map((card) => (
+            <ReferenceKpiCard key={card.label} {...card} />
+          ))}
+        </div>
+
+        <ReferencePanel
+          title={operacao.stages.title}
+          iconName="target"
+          accent="amber"
+          trailing={operacao.stages.trailing}
+          className="reference-panel-flex reference-panel-main-compact"
+        >
+          <div className="reference-lane-list reference-scroll-list">
+            {operacao.stages.rows.map((row) => (
+              <ReferenceEfficiencyRow key={row.label} {...row} />
+            ))}
+          </div>
+        </ReferencePanel>
+
+        <ReferencePanel
+          title={operacao.owners.title}
+          iconName="team"
+          accent="blue"
+          trailing={operacao.status}
+          className="reference-panel-flex reference-panel-main-fill"
+        >
+          <div className="reference-table-wrap reference-scroll-list">
+            <table className="reference-table reference-table-pro w-full min-w-[760px]">
+              <thead>
+                <tr>
+                  {operacao.owners.columns.map((column) => (
+                    <th key={column}>{column}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {operacao.owners.rows.map((item) => (
+                  <ReferenceOperacaoOwnerRowView key={item.name} item={item} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ReferencePanel>
+      </div>
+
+      <div className="reference-side-column">
+        <ReferencePanel
+          title="Resumo da Operação"
+          iconName="calendar"
+          accent="violet"
+          trailing={operacao.status}
+          className="reference-panel-flex reference-panel-side-hero"
+        >
+          <div
+            style={{
+              display: "grid",
+              gap: "0.75rem",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                color: "rgba(228, 236, 240, 0.76)",
+                fontSize: "0.9rem",
+                lineHeight: 1.6,
+              }}
+            >
+              {operacao.note}
+            </p>
+            {operacao.metrics.slice(0, 4).map((metric) => (
+              <SlaMetaItem key={metric.label} label={metric.label} value={`${metric.value} ${metric.note || ""}`.trim()} />
+            ))}
+          </div>
+        </ReferencePanel>
+
+        <ReferencePanel
+          title="Leitura Executiva"
+          iconName="spark"
+          accent="amber"
+          trailing="PAINEL CLICKUP"
+          className="reference-panel-flex reference-panel-side-sla"
+        >
+          <div
+            style={{
+              display: "grid",
+              gap: "0.8rem",
+            }}
+          >
+            {operacao.metrics.slice(2, 6).map((metric) => (
+              <SlaMetaItem key={metric.label} label={metric.label} value={`${metric.value} ${metric.note || ""}`.trim()} />
+            ))}
+          </div>
+        </ReferencePanel>
+      </div>
+    </section>
+  );
+}
+
+function ReferenceFinanceiroSection({
+  financeiro,
+}: {
+  financeiro: NonNullable<DashboardSnapshot["financeiro"]>;
+}) {
+  return (
+    <section className="reference-main-grid">
+      <div className="reference-main-column">
+        <div className="reference-kpi-strip reference-kpi-strip-pro">
+          {financeiro.metrics.map((card) => (
+            <ReferenceKpiCard key={card.label} {...card} />
+          ))}
+        </div>
+
+        <ReferencePanel
+          title={financeiro.breakdown.title}
+          iconName="coins"
+          accent="amber"
+          trailing={financeiro.breakdown.trailing}
+          className="reference-panel-flex reference-panel-main-compact"
+        >
+          <div className="reference-lane-list reference-scroll-list">
+            {financeiro.breakdown.rows.map((row) => (
+              <ReferenceEfficiencyRow key={row.label} {...row} />
+            ))}
+          </div>
+        </ReferencePanel>
+
+        <ReferencePanel
+          title={financeiro.owners.title}
+          iconName="team"
+          accent="emerald"
+          trailing={financeiro.status}
+          className="reference-panel-flex reference-panel-main-fill"
+        >
+          <div className="reference-table-wrap reference-scroll-list">
+            <table className="reference-table reference-table-pro w-full min-w-[760px]">
+              <thead>
+                <tr>
+                  {financeiro.owners.columns.map((column) => (
+                    <th key={column}>{column}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {financeiro.owners.rows.map((item) => (
+                  <ReferenceFinanceiroOwnerRowView key={item.name} item={item} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ReferencePanel>
+      </div>
+
+      <div className="reference-side-column">
+        <ReferencePanel
+          title="Resumo Financeiro"
+          iconName="calendar"
+          accent="violet"
+          trailing={financeiro.status}
+          className="reference-panel-flex reference-panel-side-hero"
+        >
+          <div
+            style={{
+              display: "grid",
+              gap: "0.75rem",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                color: "rgba(228, 236, 240, 0.76)",
+                fontSize: "0.9rem",
+                lineHeight: 1.6,
+              }}
+            >
+              {financeiro.note}
+            </p>
+            {financeiro.metrics.slice(0, 4).map((metric) => (
+              <SlaMetaItem key={metric.label} label={metric.label} value={`${metric.value} ${metric.note || ""}`.trim()} />
+            ))}
+          </div>
+        </ReferencePanel>
+
+        <ReferencePanel
+          title="Leitura Financeira"
+          iconName="spark"
+          accent="amber"
+          trailing="COMERCIAL"
+          className="reference-panel-flex reference-panel-side-sla"
+        >
+          <div
+            style={{
+              display: "grid",
+              gap: "0.8rem",
+            }}
+          >
+            {financeiro.metrics.slice(2, 6).map((metric) => (
+              <SlaMetaItem key={metric.label} label={metric.label} value={`${metric.value} ${metric.note || ""}`.trim()} />
+            ))}
+          </div>
+        </ReferencePanel>
+      </div>
+    </section>
+  );
+}
+
+function ReferenceSectionPlaceholder({ label }: { label: string }) {
+  return (
+    <section className="reference-main-grid">
+      <div className="reference-main-column">
+        <ReferencePanel
+          title={`${label} em estudo`}
+          iconName="spark"
+          accent="blue"
+          trailing="MAPA DE NAVEGAÇÃO"
+          className="reference-panel-flex reference-panel-main-fill"
+        >
+          <div
+            style={{
+              display: "grid",
+              gap: "1rem",
+              padding: "0.25rem 0",
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                color: "rgba(228, 236, 240, 0.76)",
+                fontSize: "0.95rem",
+                lineHeight: 1.7,
+              }}
+            >
+              Este módulo já existe na navegação, mas o conteúdo ainda não foi conectado a dados reais.
+            </p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "0.8rem",
+              }}
+            >
+              <SlaMetaItem label="Status" value="Em estudo" />
+              <SlaMetaItem label="Fonte" value="Nao definida" />
+              <SlaMetaItem label="Proximo passo" value="Mapear indicadores" />
+            </div>
+          </div>
+        </ReferencePanel>
+      </div>
+      <div className="reference-side-column" />
+    </section>
   );
 }
 
@@ -312,10 +853,17 @@ function ReferenceChatSlaCard({
   accent,
   targetSeconds,
   compliancePct,
-  outsideTargetCount,
+  sampleSize,
+  partialData,
   waitingCount,
 }: DashboardChatSla) {
   const accentStyle = referenceAccentStyles[accent];
+  const sampleLabel =
+    typeof sampleSize === "number"
+      ? `${sampleSize} ${sampleSize === 1 ? "resposta" : "respostas"}${partialData ? " (parcial)" : ""}`
+      : partialData
+        ? "parcial"
+        : "--";
 
   return (
     <div
@@ -336,7 +884,7 @@ function ReferenceChatSlaCard({
         }}
       >
         <div>
-          <div className="reference-kpi-label">TEMPO MEDIO DE 1a RESPOSTA</div>
+          <div className="reference-kpi-label">TEMPO MÉDIO DA 1ª RESPOSTA</div>
           <strong className="reference-kpi-value" style={{ color: accentStyle.accent }}>
             {value}
           </strong>
@@ -401,10 +949,13 @@ function ReferenceChatSlaCard({
           value={typeof compliancePct === "number" ? `${String(compliancePct).replace(".", ",")}%` : "--"}
         />
         <SlaMetaItem
-          label="Fora da Meta"
-          value={typeof outsideTargetCount === "number" ? `${outsideTargetCount} conversas` : "--"}
+          label="Amostra"
+          value={sampleLabel}
         />
-        <SlaMetaItem label="Fila" value={waitingCount ? `${waitingCount} aguardando` : "estabilizada"} />
+        <SlaMetaItem
+          label="Fila"
+          value={typeof waitingCount === "number" && waitingCount > 0 ? `${waitingCount} aguardando` : "estabilizada"}
+        />
       </div>
     </div>
   );
@@ -549,6 +1100,108 @@ function ReferenceSquadRowView({
   );
 }
 
+function ReferenceAtendimentoAgentRowView({ item }: { item: DashboardAtendimentoAgentRow }) {
+  const accentStyle = referenceAccentStyles[item.accent];
+  const initials = initialsFromName(item.name);
+
+  return (
+    <tr className="reference-squad-row">
+      <td>
+        <div className="reference-person-chip">
+          <div
+            className="reference-avatar"
+            style={{
+              backgroundColor: accentStyle.soft,
+              color: accentStyle.accent,
+              borderColor: accentStyle.border,
+            }}
+          >
+            {initials}
+          </div>
+          <div className="reference-person-copy">
+            <div className="reference-person-name">{item.name}</div>
+          </div>
+        </div>
+      </td>
+      <td className="reference-data-number" style={{ color: accentStyle.accent, fontWeight: 700 }}>
+        {item.messages}
+      </td>
+      <td className="reference-cell-strong reference-data-number">{item.activeConversations}</td>
+      <td className="reference-cell-strong reference-data-number">{item.newConversations}</td>
+    </tr>
+  );
+}
+
+function ReferenceOperacaoOwnerRowView({ item }: { item: DashboardOperacaoOwnerRow }) {
+  const accentStyle = referenceAccentStyles[item.accent];
+  const initials = initialsFromName(item.name);
+
+  return (
+    <tr className="reference-squad-row">
+      <td>
+        <div className="reference-person-chip">
+          <div
+            className="reference-avatar"
+            style={{
+              backgroundColor: accentStyle.soft,
+              color: accentStyle.accent,
+              borderColor: accentStyle.border,
+            }}
+          >
+            {initials}
+          </div>
+          <div className="reference-person-copy">
+            <div className="reference-person-name">{item.name}</div>
+          </div>
+        </div>
+      </td>
+      <td className="reference-cell-strong reference-data-number">{item.active}</td>
+      <td className="reference-data-number" style={{ color: referenceAccentStyles.rose.accent, fontWeight: 700 }}>
+        {item.stalled}
+      </td>
+      <td className="reference-data-number" style={{ color: referenceAccentStyles.emerald.accent, fontWeight: 700 }}>
+        {item.closed}
+      </td>
+    </tr>
+  );
+}
+
+function ReferenceFinanceiroOwnerRowView({ item }: { item: DashboardFinanceiroOwnerRow }) {
+  const accentStyle = referenceAccentStyles[item.accent];
+  const initials = initialsFromName(item.name);
+
+  return (
+    <tr className="reference-squad-row">
+      <td>
+        <div className="reference-person-chip">
+          <div
+            className="reference-avatar"
+            style={{
+              backgroundColor: accentStyle.soft,
+              color: accentStyle.accent,
+              borderColor: accentStyle.border,
+            }}
+          >
+            {initials}
+          </div>
+          <div className="reference-person-copy">
+            <div className="reference-person-name">{item.name}</div>
+          </div>
+        </div>
+      </td>
+      <td className="reference-data-number" style={{ color: referenceAccentStyles.emerald.accent, fontWeight: 700 }}>
+        {item.pipeline}
+      </td>
+      <td className="reference-data-number" style={{ color: referenceAccentStyles.blue.accent, fontWeight: 700 }}>
+        {item.forecast}
+      </td>
+      <td className="reference-data-number" style={{ color: referenceAccentStyles.amber.accent, fontWeight: 700 }}>
+        {item.won}
+      </td>
+    </tr>
+  );
+}
+
 function ReferenceMixRow({ label, value, suffix, accent, maxValue }: DashboardMixRow & { maxValue: number }) {
   const accentStyle = referenceAccentStyles[accent];
   const ratio = maxValue > 0 ? (value / maxValue) * 100 : 0;
@@ -586,7 +1239,7 @@ function ReferenceOpportunityCard({
   accent,
   compact = false,
 }: DashboardOpportunity & { compact?: boolean }) {
-  const accentStyle = referenceAccentStyles[accent];
+  const accentStyle = referenceAccentStyles[resolveOpportunityAccent(status, accent)];
   const probability = extractProbability(note);
 
   return (

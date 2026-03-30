@@ -31,6 +31,7 @@ const dashboardChatSlaSchema = z.object({
   averageSeconds: z.number().nonnegative().optional(),
   compliancePct: z.number().min(0).max(100).optional(),
   sampleSize: z.number().int().nonnegative().optional(),
+  partialData: z.boolean().optional(),
   withinTargetCount: z.number().int().nonnegative().optional(),
   outsideTargetCount: z.number().int().nonnegative().optional(),
   waitingCount: z.number().int().nonnegative().optional(),
@@ -40,6 +41,39 @@ const dashboardEfficiencyRowSchema = z.object({
   label: z.string().min(1),
   note: z.string().min(1),
   progress: z.number().min(0).max(100),
+  accent: referenceAccentSchema,
+});
+
+const dashboardAtendimentoAgentRowSchema = z.object({
+  name: z.string().min(1),
+  messages: z.string().min(1),
+  messagesValue: z.number().int().nonnegative().optional(),
+  activeConversations: z.string().min(1),
+  activeConversationsValue: z.number().int().nonnegative().optional(),
+  newConversations: z.string().min(1),
+  newConversationsValue: z.number().int().nonnegative().optional(),
+  accent: referenceAccentSchema,
+});
+
+const dashboardOperacaoOwnerRowSchema = z.object({
+  name: z.string().min(1),
+  active: z.string().min(1),
+  activeValue: z.number().int().nonnegative().optional(),
+  stalled: z.string().min(1),
+  stalledValue: z.number().int().nonnegative().optional(),
+  closed: z.string().min(1),
+  closedValue: z.number().int().nonnegative().optional(),
+  accent: referenceAccentSchema,
+});
+
+const dashboardFinanceiroOwnerRowSchema = z.object({
+  name: z.string().min(1),
+  pipeline: z.string().min(1),
+  pipelineValue: z.number().nonnegative().optional(),
+  forecast: z.string().min(1),
+  forecastValue: z.number().nonnegative().optional(),
+  won: z.string().min(1),
+  wonValue: z.number().nonnegative().optional(),
   accent: referenceAccentSchema,
 });
 
@@ -79,6 +113,60 @@ export const dashboardSnapshotSchema = z.object({
   header: dashboardHeaderSchema,
   kpis: z.array(dashboardKpiCardSchema),
   chatSla: dashboardChatSlaSchema.optional(),
+  atendimento: z
+    .object({
+      title: z.string().min(1),
+      status: z.string().min(1),
+      note: z.string().min(1),
+      metrics: z.array(dashboardKpiCardSchema),
+      backlog: z.object({
+        title: z.string().min(1),
+        trailing: z.string().min(1),
+        rows: z.array(dashboardEfficiencyRowSchema),
+      }),
+      agents: z.object({
+        title: z.string().min(1),
+        columns: z.array(z.string().min(1)),
+        rows: z.array(dashboardAtendimentoAgentRowSchema),
+      }),
+    })
+    .optional(),
+  operacao: z
+    .object({
+      title: z.string().min(1),
+      status: z.string().min(1),
+      note: z.string().min(1),
+      metrics: z.array(dashboardKpiCardSchema),
+      stages: z.object({
+        title: z.string().min(1),
+        trailing: z.string().min(1),
+        rows: z.array(dashboardEfficiencyRowSchema),
+      }),
+      owners: z.object({
+        title: z.string().min(1),
+        columns: z.array(z.string().min(1)),
+        rows: z.array(dashboardOperacaoOwnerRowSchema),
+      }),
+    })
+    .optional(),
+  financeiro: z
+    .object({
+      title: z.string().min(1),
+      status: z.string().min(1),
+      note: z.string().min(1),
+      metrics: z.array(dashboardKpiCardSchema),
+      breakdown: z.object({
+        title: z.string().min(1),
+        trailing: z.string().min(1),
+        rows: z.array(dashboardEfficiencyRowSchema),
+      }),
+      owners: z.object({
+        title: z.string().min(1),
+        columns: z.array(z.string().min(1)),
+        rows: z.array(dashboardFinanceiroOwnerRowSchema),
+      }),
+    })
+    .optional(),
   efficiency: z.object({
     title: z.string().min(1),
     trailing: z.string().min(1),
