@@ -72,6 +72,63 @@ Terminal 2 (frontend):
 npm run dev:front
 ```
 
+## Deploy em VPS
+
+Premissas:
+
+- frontend servido como estatico
+- API Node rodando em processo dedicado
+- proxy reverso na frente (ex.: Nginx)
+
+Checklist minimo:
+
+1. Clonar o repositorio e instalar dependencias:
+
+```bash
+npm install
+npm --prefix server install
+```
+
+2. Criar os arquivos de ambiente:
+
+```bash
+cp .env.example .env
+cp server/.env.example server/.env
+```
+
+3. Preencher no `server/.env`:
+
+- `CLICKUP_API_TOKEN`
+- `BRADIAL_CHAT_BASE_URL`
+- `BRADIAL_CHAT_ACCOUNT_ID`
+- `BRADIAL_CHAT_API_TOKEN`
+- `BRADIAL_CHAT_INBOX_ID`
+- `CORS_ORIGIN` com o dominio final, se necessario
+
+4. Para producao, manter `VITE_API_BASE_URL` vazio em `.env` quando o frontend e a API estiverem sob o mesmo dominio/proxy.
+
+5. Gerar build:
+
+```bash
+npm run build
+npm run build:api
+npm run api:init
+```
+
+6. Subir a API:
+
+```bash
+npm --prefix server run start
+```
+
+7. Servir o frontend a partir de `dist/` via Nginx ou outro servidor estatico.
+
+Observacoes:
+
+- o banco SQLite fica em `server/data/dashboard.sqlite`
+- `server/data/`, `dist/`, `.env` e logs nao vao para o Git
+- sem as variaveis do Bradial, o dashboard sobe, mas a parte de atendimento/chat nao fica completa
+
 ## Endpoints principais
 
 - `GET /api/health`
